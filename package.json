@@ -1,0 +1,17 @@
+{
+  "name": "game",
+  "version": "0.0.1",
+  "description": "",
+  "main": "server.js",
+  "dependencies": {
+    "root": "~0.7.1",
+    "xtend": "~3.0.0",
+    "socket.io": "~1.0.4"
+  },
+  "devDependencies": {
+    "browserify": "~4.1.6",
+    "pump": "~0.3.2",
+    "after-all": "~1.0.0",
+    "chokidar": "~0.8.2"
+  }
+}
