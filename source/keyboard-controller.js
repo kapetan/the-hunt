@@ -42,14 +42,6 @@ Keyboard.prototype.some = function(keys) {
 	});
 };
 
-// Keyboard.prototype.every = function() {
-// 	var self = this;
-
-// 	return Array.prototype.slice.call(arguments).every(function(key) {
-// 		return self.pressed(key);
-// 	});
-// };
-
 var KeyboardController = function() {
 	this._keyboard = new Keyboard();
 	this._keyboard.attach();

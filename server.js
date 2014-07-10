@@ -5,11 +5,18 @@ var send = require('send');
 var chokidar = require('chokidar');
 var socketio = require('socket.io');
 
+var Game = require('./source/game.server');
+var find = require('./source/utils/find');
+
 var build = require('./build');
 
 var PORT = 10103;
+var UPDATE_FREQUENCY = 45;
 
 var app = root();
+var game = new Game({ width: 512, height: 512 });
+
+game.start();
 
 var watch = function() {
 	chokidar.watch(path.join(__dirname, 'source')).on('change', function() {
@@ -41,18 +48,35 @@ app.on('bind', function(address, server) {
 
 		socket.on('initialize', function(message) {
 			message.id = socket.id;
+
+			game.addPlayer(socket, message);
 			socket.broadcast.emit('player_join', message);
 		});
 
-		socket.on('update', function(message) {
-			message.id = socket.id;
-			socket.broadcast.emit('player_update', message);
-		});
-
 		socket.on('disconnect', function() {
-			socket.broadcast.emit('player_leave', { id: socket.id });
+			var player = find(game.players, { id: socket.id });
+
+			if(player) {
+				game.removePlayer(player);
+				socket.broadcast.emit('player_leave', { id: socket.id });
+			}
 		});
 	});
+
+	setTimeout(function update() {
+		var players = game.players.map(function(player) {
+			return {
+				id: player.id,
+				sequence: player.controller.sequence,
+				position: player.position,
+				direction: player.direction
+			};
+		});
+
+		io.emit('update', players);
+
+		setTimeout(update, UPDATE_FREQUENCY);
+	}, UPDATE_FREQUENCY);
 });
 
 app.listen(PORT, function() {

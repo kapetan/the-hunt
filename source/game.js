@@ -1,26 +1,18 @@
 var Rectangle = require('./bodies/rectangle');
 var Player = require('./bodies/player');
-//var GhostOpponent = require('./bodies/ghost-opponent');
 
 var KeyboardController = require('./keyboard-controller');
 var MouseController = require('./mouse-controller');
 
+var append = require('./utils/append');
+var remove = require('./utils/remove');
+var find = require('./utils/find');
+
 var level = require('./levels/level-1');
 
 var CLEAR_RADIUS = 40;
-
-var append = function(target, source) {
-	source.forEach(function(item) {
-		target.push(item);
-	});
-};
-
-var remove = function(target, source) {
-	source.forEach(function(item) {
-		var i = target.indexOf(item);
-		if(i >= 0) target.splice(i, 1);
-	});
-};
+var UPDATE_FREQUENCY = 16;
+var UPDATES_SIZE = 60 * 2; // 60fps * 2s
 
 var InputController = function(element) {
 	this.keyboard = new KeyboardController();
@@ -46,85 +38,23 @@ InputController.prototype.toJSON = function() {
 	return json;
 };
 
-var RemoteController = function(socket) {
-	this.socket = socket;
-	this.update = null;
+var NoopController = function() {};
 
-	var self = this;
-
-	socket.on('player_update', function(message) {
-		self.update = message;
-	});
+NoopController.prototype.action = function() {
+	return false;
 };
 
-RemoteController.prototype.action = function(name) {
-	return this.update ? this.update.inputs[name] : false;
+NoopController.prototype.target = function() {
+	return false;
 };
 
-RemoteController.prototype.target = function() {
-	return this.update && this.update.inputs.target;
+NoopController.prototype.active = function() {
+	return false;
 };
 
-// var Mouse = function(element) {
-// 	this.position = null;
-// 	this.pressed = false;
-
-// 	var self = this;
-// 	var local = {};
-
-// 	element.addEventListener('mousemove', function(e) {
-// 		local.x = e.offsetX;
-// 		local.y = e.offsetY;
-
-// 		self.position = local;
-// 	});
-// 	element.addEventListener('mouseleave', function() {
-// 		self.position = null;
-// 		self.pressed = false;
-// 	});
-// 	element.addEventListener('mousedown', function(e) {
-// 		self.pressed = true;
-// 	});
-// 	element.addEventListener('mouseup', function(e) {
-// 		self.pressed = false;
-// 	});
-// };
-
-// var Keyboard = function(element) {
-// 	this.keys = {};
-
-// 	var self = this;
-
-// 	window.addEventListener('keydown', function(e) {
-// 		self.keys[e.keyCode] = true;
-// 	});
-// 	window.addEventListener('keyup', function(e) {
-// 		self.keys[e.keyCode] = false;
-// 	});
-// };
-
-// Keyboard.KEYS = { left: 37, up: 38, right: 39, down: 40, space: 32 };
-
-// Keyboard.prototype.pressed = function(key) {
-// 	key = (typeof key === 'string') ? Keyboard.KEYS[key] : key;
-// 	return !!this.keys[key];
-// };
-
-// Keyboard.prototype.some = function() {
-// 	var self = this;
-
-// 	return Array.prototype.slice.call(arguments).some(function(key) {
-// 		return self.pressed(key);
-// 	});
-// };
-
-// Keyboard.prototype.every = function() {
-// 	var self = this;
-
-// 	return Array.prototype.slice.call(arguments).every(function(key) {
-// 		return self.pressed(key);
-// 	});
-// };
+NoopController.prototype.toJSON = function() {
+	return {};
+};
 
 var Game = function(element) {
 	element = document.getElementById(element);
@@ -132,15 +62,17 @@ var Game = function(element) {
 	this.canvas = element.getContext('2d');
 	this.size = { width: element.width, height: element.height };
 	this.bounds = Rectangle.aligned({ x: 0, y: 0 }, this.size, 0);
+
 	this.bodies = [];
 	this.others = [];
+	this.ghosts = [];
+
+	this.updates = [];
+	this.inputs = [];
 
 	this._animation = null;
+	this._update = null;
 	this._socket = null;
-	//this.mouse = new Mouse(element);
-	//this.keyboard = new Keyboard(element);
-
-	//var keyboard = new KeyboardController();
 
 	this._add = [];
 	this._remove = [];
@@ -156,7 +88,7 @@ var Game = function(element) {
 	this.addBody(this.player);
 	this.level.fog.reveal(this.player);
 
-	//level(this);
+	level(this);
 };
 
 Game.prototype.update = function(dt) {
@@ -189,67 +121,100 @@ Game.prototype.draw = function() {
 };
 
 Game.prototype.addBody = function(body) {
-	if(this._animation) this._add.push(body);
+	if(this._update) this._add.push(body);
 	else this.bodies.push(body);
 };
 
 Game.prototype.removeBody = function(body) {
-	if(this._animation) this._remove.push(body);
-	else remove(this.bodies, [body]);
+	if(this._update) this._remove.push(body);
+	else remove(this.bodies, body);
 };
 
 Game.prototype.start = function() {
 	var self = this;
 	var socket = this._socket = io();
 	var lastTick = Date.now();
+	var sequence = 0;
 
 	socket.on('connect', function() {
 		socket.emit('initialize', self.player.toJSON());
 	});
 	socket.on('initialize', function(message) {
 		self.player.id = message.id;
+		self._addGhost(self.player);
+	});
+	socket.on('update', function(updates) {
+		self.updates.push(updates);
+
+		if(self.updates.length >= UPDATES_SIZE) {
+			self.updates.shift();
+		}
+
+		updates.forEach(function(player) {
+			var ghost = find(self.ghosts, { id: player.id });
+
+			if(ghost) {
+				ghost.position = player.position;
+				ghost.direction = player.direction;
+			}
+		});
+
+		// var local = find(updates, { id: self.player.id });
+		// var latest = find(self.inputs, { sequence: local.sequence });
+
 	});
 	socket.on('player_join', function(message) {
-		var remote = new RemoteController(socket);
+		var remote = new NoopController();
 		var player = new Player(self, remote, message);
 
 		self.addBody(player);
 		self.others.push(player);
+		self._addGhost(player);
 	});
 	socket.on('player_leave', function(message) {
-		for(var i = 0; i < self.others.length; i++) {
-			var other = self.others[i];
+		var other = find(self.others, { id: message.id });
+		var ghost = find(self.ghosts, { id: message.id });
 
-			if(other.id === message.id) {
-				self.removeBody(other);
-				self.others.splice(i, 1);
-
-				return;
-			}
+		if(other) {
+			self.removeBody(other);
+			remove(self.others, other);
+		}
+		if(ghost) {
+			self.removeBody(ghost);
+			remove(self.ghosts, ghost);
 		}
 	});
 
-	this._animation = requestAnimationFrame(function tick() {
+	this._update = setInterval(function() {
 		var now = Date.now();
 		var dt = now - lastTick;
 		lastTick = now;
 
 		self.update(dt);
-		self.draw();
 
 		if(self.player.isActive()) {
-			socket.emit('update', self.player.getInputs());
-		}
+			var update = self.player.controller.toJSON();
+			update.sequence = sequence++;
+			update.dt = dt;
 
+			self.inputs.push(update);
+			socket.emit('update', update);
+		}
+	}, UPDATE_FREQUENCY);
+
+	this._animation = requestAnimationFrame(function tick() {
+		self.draw();
 		self._animation = requestAnimationFrame(tick);
 	});
 };
 
 Game.prototype.stop = function() {
 	cancelAnimationFrame(this._animation);
+	clearInterval(this._update);
 	this._socket.close();
 
 	this._animation = null;
+	this._update = null;
 	this._socket = null;
 };
 
@@ -275,6 +240,16 @@ Game.prototype.getCollisions = function(rectangle, ignore) {
 
 Game.prototype.inBounds = function(rectangle) {
 	return this.bounds.isRectangleInside(rectangle);
+};
+
+Game.prototype._addGhost = function(player) {
+	var options = player.toJSON();
+	options.visibility = 0.5;
+	options.collidable = false;
+
+	var ghost = new Player(this, new NoopController(), options);
+	this.ghosts.push(ghost);
+	this.addBody(ghost);
 };
 
 module.exports = Game;

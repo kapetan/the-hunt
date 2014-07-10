@@ -9,7 +9,6 @@ var fog = function() {
 
 var Fog = function(game) {
 	this.game = game;
-	//this.player = player;
 	this.revealed = [];
 
 	this.active = false;
@@ -21,9 +20,6 @@ Fog.prototype.update = function(dt) {};
 Fog.prototype.draw = function() {
 	var canvas = this.game.canvas;
 	var size = this.game.size;
-
-	//var player = this.player;
-	//var position = player.position;
 
 	canvas.save();
 

@@ -2,22 +2,6 @@ var math = require('../math');
 var colliding = require('../colliding');
 
 var getPoints = function(position, size, direction) {
-	// width = width / 2;
-	// height = height / 2;
-
-	// var fx = Math.cos(direction) * width;
-	// var fy = Math.sin(direction) * width;
-
-	// var dx = Math.cos(direction + Math.PI / 2) * height;
-	// var dy = Math.sin(direction + Math.PI / 2) * height;
-
-	// return [
-	// 	{ x: x + fx + dx, y: y + fy + dy },
-	// 	{ x: x + fx - dx, y: y + fy - dy },
-	// 	{ x: x - fx - dx, y: y - fy - dy },
-	// 	{ x: x - fx + dx, y: y - fy + dy }
-	// ];
-
 	var x = position.x;
 	var y = position.y;
 
@@ -66,14 +50,6 @@ Rectangle.aligned = function(position, size) {
 };
 
 Rectangle.prototype.isColliding = function(rectangle) {
-	// var self = this;
-
-	// return (this.points.some(function(point) {
-	// 	return rectangle.isPointInside(point);
-	// }) || rectangle.points.some(function(point) {
-	// 	return self.isPointInside(point);
-	// }));
-
 	return colliding(this.points, rectangle.points);
 };
 
