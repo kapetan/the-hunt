@@ -49,7 +49,7 @@ var Player = function(game, controller, options) {
 	this.reloadSpeed = options.reloadSpeed;
 	this.ammunition = options.ammunition;
 
-	this.footTrack = new FootTrack(game, this);
+	this.footTrack = options.footTrack || new FootTrack(game, this);
 };
 
 util.inherits(Player, Base);
@@ -58,10 +58,12 @@ Player.prototype.update = function(dt) {
 	this.footTrack.update(dt);
 	if(this.ammunition < 1) this.ammunition += this.reloadSpeed * dt;
 
-	var controller = this.controller;
-	var target = controller.target();
+	this.processInput(this.controller.toJSON(), dt);
+};
+
+Player.prototype.processInput = function(input, dt) {
+	var target = input.target;
 	var position = this.position;
-	var size = this.size;
 
 	var next = { x: position.x, y: position.y, direction: this.direction };
 
@@ -72,24 +74,24 @@ Player.prototype.update = function(dt) {
 		next.x = position.x + d.x * this.speed * dt;
 		next.y = position.y + d.y * this.speed * dt;
 	} else {
-		if(controller.action('shoot') && this.ammunition >= 1) {
+		if(input.shoot && this.ammunition >= 1) {
 			var bullet = new Bullet(this.game, this);
 
 			this.ammunition = 0;
 			this.game.addBody(bullet);
 		}
-		if(controller.action('left')) {
+		if(input.left) {
 			next.direction = this.direction - ROTATION_SPEED * dt;
 		}
-		if(controller.action('right')) {
+		if(input.right) {
 			next.direction = this.direction + ROTATION_SPEED * dt;
 		}
-		if(controller.action('up')) {
+		if(input.up) {
 			var t = math.translate(position, this.direction, this.speed * dt);
 			next.x = t.x;
 			next.y = t.y;
 		}
-		if(controller.action('down')) {
+		if(input.down) {
 			var t = math.translate(position, this.direction + Math.PI, this.speed * dt);
 			next.x = t.x;
 			next.y = t.y;

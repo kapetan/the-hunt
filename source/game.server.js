@@ -21,11 +21,11 @@ var ClientController = function(socket) {
 };
 
 ClientController.prototype.action = function(name) {
-	return this.updates.length ? this.updates[0][name] : false;
+	return this.updates.length ? this.updates[0].input[name] : false;
 };
 
 ClientController.prototype.target = function() {
-	return this.updates.length ? this.updates[0].target : null;
+	return this.updates.length ? this.updates[0].input.target : null;
 };
 
 ClientController.prototype.active = function() {
@@ -38,7 +38,7 @@ ClientController.prototype.next = function() {
 };
 
 ClientController.prototype.toJSON = function() {
-	return this.updates[0] || {};
+	return this.updates.length ? this.updates[0].input : {};
 };
 
 var Game = function(size) {

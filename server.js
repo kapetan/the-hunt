@@ -44,12 +44,15 @@ app.on('bind', function(address, server) {
 	var io = socketio(server);
 
 	io.on('connection', function(socket) {
-		socket.emit('initialize', { id: socket.id });
-
 		socket.on('initialize', function(message) {
 			message.id = socket.id;
+			var players = game.players.map(function(player) {
+				return player.toJSON();
+			});
 
 			game.addPlayer(socket, message);
+
+			socket.emit('initialize', { id: socket.id, players: players });
 			socket.broadcast.emit('player_join', message);
 		});
 
@@ -67,7 +70,7 @@ app.on('bind', function(address, server) {
 		var players = game.players.map(function(player) {
 			return {
 				id: player.id,
-				sequence: player.controller.sequence,
+				sequence: player.controller.latestSequence,
 				position: player.position,
 				direction: player.direction
 			};

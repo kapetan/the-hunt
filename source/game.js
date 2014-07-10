@@ -14,6 +14,8 @@ var CLEAR_RADIUS = 40;
 var UPDATE_FREQUENCY = 16;
 var UPDATES_SIZE = 60 * 2; // 60fps * 2s
 
+var noop = function() {};
+
 var InputController = function(element) {
 	this.keyboard = new KeyboardController();
 	this.mouse = new MouseController(element);
@@ -133,78 +135,12 @@ Game.prototype.removeBody = function(body) {
 Game.prototype.start = function() {
 	var self = this;
 	var socket = this._socket = io();
-	var lastTick = Date.now();
-	var sequence = 0;
 
 	socket.on('connect', function() {
 		socket.emit('initialize', self.player.toJSON());
 	});
 	socket.on('initialize', function(message) {
-		self.player.id = message.id;
-		self._addGhost(self.player);
-	});
-	socket.on('update', function(updates) {
-		self.updates.push(updates);
-
-		if(self.updates.length >= UPDATES_SIZE) {
-			self.updates.shift();
-		}
-
-		updates.forEach(function(player) {
-			var ghost = find(self.ghosts, { id: player.id });
-
-			if(ghost) {
-				ghost.position = player.position;
-				ghost.direction = player.direction;
-			}
-		});
-
-		// var local = find(updates, { id: self.player.id });
-		// var latest = find(self.inputs, { sequence: local.sequence });
-
-	});
-	socket.on('player_join', function(message) {
-		var remote = new NoopController();
-		var player = new Player(self, remote, message);
-
-		self.addBody(player);
-		self.others.push(player);
-		self._addGhost(player);
-	});
-	socket.on('player_leave', function(message) {
-		var other = find(self.others, { id: message.id });
-		var ghost = find(self.ghosts, { id: message.id });
-
-		if(other) {
-			self.removeBody(other);
-			remove(self.others, other);
-		}
-		if(ghost) {
-			self.removeBody(ghost);
-			remove(self.ghosts, ghost);
-		}
-	});
-
-	this._update = setInterval(function() {
-		var now = Date.now();
-		var dt = now - lastTick;
-		lastTick = now;
-
-		self.update(dt);
-
-		if(self.player.isActive()) {
-			var update = self.player.controller.toJSON();
-			update.sequence = sequence++;
-			update.dt = dt;
-
-			self.inputs.push(update);
-			socket.emit('update', update);
-		}
-	}, UPDATE_FREQUENCY);
-
-	this._animation = requestAnimationFrame(function tick() {
-		self.draw();
-		self._animation = requestAnimationFrame(tick);
+		self._initialize(message);
 	});
 };
 
@@ -242,10 +178,106 @@ Game.prototype.inBounds = function(rectangle) {
 	return this.bounds.isRectangleInside(rectangle);
 };
 
+Game.prototype._initialize = function(options) {
+	var self = this;
+	var socket = this._socket;
+	var lastTick = Date.now();
+	var sequence = 0;
+
+	this.player.id = options.id;
+	this._addGhost(this.player);
+
+	options.players.forEach(function(other) {
+		self._addOther(other);
+	});
+
+	socket.on('update', function(updates) {
+		self.updates.push(updates);
+
+		if(self.updates.length >= UPDATES_SIZE) {
+			self.updates.shift();
+		}
+
+		updates.forEach(function(player) {
+			var ghost = find(self.ghosts, { id: player.id });
+
+			if(ghost) {
+				ghost.position = player.position;
+				ghost.direction = player.direction;
+			}
+		});
+
+		var local = find(updates, { id: self.player.id });
+		var latestInput = find(self.inputs, { sequence: local.sequence });
+		var latestIndex = self.inputs.indexOf(latestInput);
+
+		if(latestIndex >= 0) {
+			self.inputs.splice(0, latestIndex + 1);
+
+			self.player.position = local.position;
+			self.player.direction = local.direction;
+
+			self.inputs.forEach(function(update) {
+				self.player.processInput(update.input, update.dt);
+			});
+		}
+	});
+	socket.on('player_join', function(message) {
+		self._addOther(message);
+	});
+	socket.on('player_leave', function(message) {
+		var other = find(self.others, { id: message.id });
+		var ghost = find(self.ghosts, { id: message.id });
+
+		if(other) {
+			self.removeBody(other);
+			remove(self.others, other);
+		}
+		if(ghost) {
+			self.removeBody(ghost);
+			remove(self.ghosts, ghost);
+		}
+	});
+
+	this._update = setInterval(function() {
+		var now = Date.now();
+		var dt = now - lastTick;
+		lastTick = now;
+
+		self.update(dt);
+
+		if(self.player.isActive()) {
+			var update = {
+				input: self.player.controller.toJSON(),
+				sequence: sequence++,
+				dt: dt
+			};
+
+			self.inputs.push(update);
+			socket.emit('update', update);
+		}
+	}, UPDATE_FREQUENCY);
+
+	this._animation = requestAnimationFrame(function tick() {
+		self.draw();
+		self._animation = requestAnimationFrame(tick);
+	});
+};
+
+Game.prototype._addOther = function(options) {
+	var remote = new NoopController();
+	var player = new Player(this, remote, options);
+
+	this.addBody(player);
+	this.others.push(player);
+	this._addGhost(player);
+};
+
 Game.prototype._addGhost = function(player) {
 	var options = player.toJSON();
 	options.visibility = 0.5;
 	options.collidable = false;
+	options.footTrack = { update: noop };
 
 	var ghost = new Player(this, new NoopController(), options);
 	this.ghosts.push(ghost);
