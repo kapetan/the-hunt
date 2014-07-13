@@ -1281,7 +1281,6 @@ var Game = function(element) {
 
 	this.bodies = [];
 	this.others = [];
-	this.ghosts = [];
 
 	this.updates = [];
 	this.inputs = [];
@@ -1400,7 +1399,6 @@ Game.prototype._initialize = function(options) {
 	var sequence = 0;
 
 	this.player.id = options.id;
-	this._addGhost(this.player);
 
 	options.players.forEach(function(other) {
 		self._addOther(other);
@@ -1423,15 +1421,10 @@ Game.prototype._initialize = function(options) {
 	});
 	socket.on('player_leave', function(message) {
 		var other = find(self.others, { id: message.id });
-		var ghost = find(self.ghosts, { id: message.id });
 
 		if(other) {
 			self.removeBody(other);
 			remove(self.others, other);
-		}
-		if(ghost) {
-			self.removeBody(ghost);
-			remove(self.ghosts, ghost);
 		}
 	});
 
@@ -1469,18 +1462,6 @@ Game.prototype._addOther = function(options) {
 
 	this.addBody(player);
 	this.others.push(player);
-	this._addGhost(player);
-};
-
-Game.prototype._addGhost = function(player) {
-	var options = player.toJSON();
-	options.visibility = 0.5;
-	options.collidable = false;
-	options.footTrack = { update: noop };
-
-	var ghost = new Player(this, new NoopController(), options);
-	this.ghosts.push(ghost);
-	this.addBody(ghost);
 };
 
 Game.prototype._reconcileUpdate = function(update) {
@@ -1499,15 +1480,6 @@ Game.prototype._reconcileUpdate = function(update) {
 			self.player.processInput(update.input, update.dt);
 		});
 	}
-
-	update.players.forEach(function(player) {
-		var ghost = find(self.ghosts, { id: player.id });
-
-		if(ghost) {
-			ghost.position = player.position;
-			ghost.direction = player.direction;
-		}
-	});
 };
 
 Game.prototype._interpolateUpdates = function() {
