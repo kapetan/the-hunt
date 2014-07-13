@@ -1511,14 +1511,14 @@ Game.prototype._interpolateUpdates = function() {
 module.exports = Game;
 
 },{"./bodies/player":9,"./bodies/rectangle":10,"./keyboard-controller":14,"./levels/level-1":16,"./math":18,"./mouse-controller":19,"./utils/append":20,"./utils/find":21,"./utils/remove":22}],13:[function(require,module,exports){
-var Game = require('./game');
+var Game = require('./game.client');
 
 (function() {
 	var game = window.game = new Game('canvas');
 	game.start();
 }());
 
-},{"./game":12}],14:[function(require,module,exports){
+},{"./game.client":12}],14:[function(require,module,exports){
 var ROTATION_SPEED = Math.PI / 800;
 
 var values = function(obj) {
