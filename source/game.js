@@ -1,6 +1,7 @@
 var Rectangle = require('./bodies/rectangle');
 var Player = require('./bodies/player');
 
+var math = require('./math');
 var KeyboardController = require('./keyboard-controller');
 var MouseController = require('./mouse-controller');
 
@@ -13,6 +14,7 @@ var level = require('./levels/level-1');
 var CLEAR_RADIUS = 40;
 var UPDATE_FREQUENCY = 16;
 var UPDATES_SIZE = 60 * 2; // 60fps * 2s
+var UPDATE_OFFSET = 100;
 
 var noop = function() {};
 
@@ -75,6 +77,7 @@ var Game = function(element) {
 	this._animation = null;
 	this._update = null;
 	this._socket = null;
+	this._time = { u: 0, v: 0 };
 
 	this._add = [];
 	this._remove = [];
@@ -94,8 +97,6 @@ var Game = function(element) {
 };
 
 Game.prototype.update = function(dt) {
-	var self = this;
-
 	append(this.bodies, this._add);
 	remove(this.bodies, this._remove);
 
@@ -105,6 +106,8 @@ Game.prototype.update = function(dt) {
 	this.bodies.forEach(function(body) {
 		body.update(dt);
 	});
+
+	this._interpolateUpdates();
 };
 
 Game.prototype.draw = function() {
@@ -191,36 +194,17 @@ Game.prototype._initialize = function(options) {
 		self._addOther(other);
 	});
 
-	socket.on('update', function(updates) {
-		self.updates.push(updates);
+	socket.on('update', function(update) {
+		self.updates.push(update);
+
+		self._time.u = Date.now();
+		self._time.v = update.time;
 
 		if(self.updates.length >= UPDATES_SIZE) {
 			self.updates.shift();
 		}
 
-		updates.forEach(function(player) {
-			var ghost = find(self.ghosts, { id: player.id });
-
-			if(ghost) {
-				ghost.position = player.position;
-				ghost.direction = player.direction;
-			}
-		});
-
-		var local = find(updates, { id: self.player.id });
-		var latestInput = find(self.inputs, { sequence: local.sequence });
-		var latestIndex = self.inputs.indexOf(latestInput);
-
-		if(latestIndex >= 0) {
-			self.inputs.splice(0, latestIndex + 1);
-
-			self.player.position = local.position;
-			self.player.direction = local.direction;
-
-			self.inputs.forEach(function(update) {
-				self.player.processInput(update.input, update.dt);
-			});
-		}
+		self._reconcileUpdate(update);
 	});
 	socket.on('player_join', function(message) {
 		self._addOther(message);
@@ -245,6 +229,9 @@ Game.prototype._initialize = function(options) {
 		lastTick = now;
 
 		self.update(dt);
+
+		self._time.v += (now - self._time.u);
+		self._time.u = now;
 
 		if(self.player.isActive()) {
 			var update = {
@@ -282,6 +269,59 @@ Game.prototype._addGhost = function(player) {
 	var ghost = new Player(this, new NoopController(), options);
 	this.ghosts.push(ghost);
 	this.addBody(ghost);
+};
+
+Game.prototype._reconcileUpdate = function(update) {
+	var self = this;
+	var local = find(update.players, { id: this.player.id });
+	var latestInput = find(this.inputs, { sequence: local.sequence });
+	var latestIndex = this.inputs.indexOf(latestInput);
+
+	if(latestIndex >= 0) {
+		this.inputs.splice(0, latestIndex + 1);
+
+		this.player.position = local.position;
+		this.player.direction = local.direction;
+
+		this.inputs.forEach(function(update) {
+			self.player.processInput(update.input, update.dt);
+		});
+	}
+
+	update.players.forEach(function(player) {
+		var ghost = find(self.ghosts, { id: player.id });
+
+		if(ghost) {
+			ghost.position = player.position;
+			ghost.direction = player.direction;
+		}
+	});
+};
+
+Game.prototype._interpolateUpdates = function() {
+	var self = this;
+	var offset = this._time.v - UPDATE_OFFSET;
+
+	var previousUpdate = find(this.updates, function(update, i, updates) {
+		return i < updates.length - 1 && update.time < offset && offset < updates[i + 1].time;
+	});
+
+	var nextUpdate = previousUpdate && this.updates[this.updates.indexOf(previousUpdate) + 1];
+
+	if(!previousUpdate || !nextUpdate) return;
+
+	var diff = nextUpdate.time - previousUpdate.time;
+	var progress = diff ? (offset - previousUpdate.time) / diff : 1;
+
+	nextUpdate.players.forEach(function(nextPlayer) {
+		var otherPlayer = find(self.others, { id: nextPlayer.id });
+		var previousPlayer = find(previousUpdate.players, { id: nextPlayer.id });
+
+		if(otherPlayer && previousPlayer) {
+			otherPlayer.position = math.lerp(previousPlayer.position, nextPlayer.position, progress);
+			otherPlayer.direction = (nextPlayer.direction - previousPlayer.direction) * progress + nextPlayer.direction;
+		}
+	});
 };
 
 module.exports = Game;

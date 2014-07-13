@@ -76,7 +76,7 @@ app.on('bind', function(address, server) {
 			};
 		});
 
-		io.emit('update', players);
+		io.emit('update', { players: players, time: Date.now() });
 
 		setTimeout(update, UPDATE_FREQUENCY);
 	}, UPDATE_FREQUENCY);

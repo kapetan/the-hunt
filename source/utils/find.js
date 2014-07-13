@@ -1,7 +1,7 @@
 var find = function(arr, fn) {
 	for(var i = 0; i < arr.length; i++) {
 		var item = arr[i];
-		if(fn(item, i)) return item;
+		if(fn(item, i, arr)) return item;
 	}
 };
 

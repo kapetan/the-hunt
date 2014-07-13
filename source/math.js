@@ -1,3 +1,7 @@
+var lerp = function(v1, v2, t) {
+	return v1 + t * (v2 - v1);
+};
+
 exports.translate = function(point, direction, length) {
 	var x1 = Math.cos(direction) * length;
 	var y1 = Math.sin(direction) * length;
@@ -23,7 +27,7 @@ exports.rotate = function(point, pivot, angle) {
 
 exports.direction = function(vector) {
 	var length = exports.length(vector);
-	var radians = Math.acos(vector.x / length);
+	var radians = length ? Math.acos(vector.x / length) : 0;
 
 	if(vector.y < 0) radians = -radians;
 
@@ -52,4 +56,8 @@ exports.normalize = function(vector) {
 		x: vector.x / length,
 		y: vector.y / length
 	};
+};
+
+exports.lerp = function(p1, p2, t) {
+	return { x: lerp(p1.x, p2.x, t), y: lerp(p1.y, p2.y, t) };
 };
