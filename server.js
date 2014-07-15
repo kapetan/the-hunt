@@ -10,7 +10,7 @@ var find = require('./source/utils/find');
 
 var build = require('./build');
 
-var PORT = 10103;
+var PORT = process.env.PORT || 10103;
 var UPDATE_FREQUENCY = 45;
 
 var app = root();
