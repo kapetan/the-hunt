@@ -8,6 +8,7 @@ var MouseController = require('./mouse-controller');
 var append = require('./utils/append');
 var remove = require('./utils/remove');
 var find = require('./utils/find');
+var filter = require('./utils/filter');
 
 var level = require('./levels/level-1');
 
@@ -23,41 +24,39 @@ var InputController = function(element) {
 	this.mouse = new MouseController(element);
 };
 
-InputController.prototype.action = function(name) {
-	return this.keyboard.action(name);
-};
-
-InputController.prototype.target = function() {
-	return this.mouse.target();
-};
-
-InputController.prototype.active = function() {
-	return this.keyboard.active() || this.mouse.active();
+InputController.prototype.get = function(name) {
+	return this.keyboard.get(name) || this.mouse.get(name);
 };
 
 InputController.prototype.toJSON = function() {
 	var json = this.keyboard.toJSON();
-	json.target = this.mouse.toJSON().target;
+	json.target = this.mouse.get('target');
 
-	return json;
+	return filter(json, function(key, value) {
+		return value;
+	});
 };
 
 var NoopController = function() {};
 
-NoopController.prototype.action = function() {
-	return false;
-};
-
-NoopController.prototype.target = function() {
-	return false;
-};
-
-NoopController.prototype.active = function() {
-	return false;
+NoopController.prototype.get = function(name) {
+	return null;
 };
 
 NoopController.prototype.toJSON = function() {
 	return {};
+};
+
+var SingleInputController = function(input) {
+	this.input = input;
+};
+
+SingleInputController.prototype.get = function(name) {
+	return this.input[name] || null;
+};
+
+SingleInputController.prototype.toJSON = function() {
+	return this.input;
 };
 
 var Game = function(element) {
@@ -226,9 +225,11 @@ Game.prototype._initialize = function(options) {
 		self._time.v += (now - self._time.u);
 		self._time.u = now;
 
-		if(self.player.isActive()) {
+		var input = self.player.controller.toJSON();
+
+		if(Object.keys(input).length) {
 			var update = {
-				input: self.player.controller.toJSON(),
+				input: input,
 				sequence: sequence++,
 				dt: dt
 			};
@@ -265,7 +266,7 @@ Game.prototype._reconcileUpdate = function(update) {
 		this.player.direction = local.direction;
 
 		this.inputs.forEach(function(update) {
-			self.player.processInput(update.input, update.dt);
+			self.player.processInput(new SingleInputController(update.input), update.dt);
 		});
 	}
 };

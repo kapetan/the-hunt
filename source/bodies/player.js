@@ -58,11 +58,11 @@ Player.prototype.update = function(dt) {
 	this.footTrack.update(dt);
 	if(this.ammunition < 1) this.ammunition += this.reloadSpeed * dt;
 
-	this.processInput(this.controller.toJSON(), dt);
+	this.processInput(this.controller, dt);
 };
 
-Player.prototype.processInput = function(input, dt) {
-	var target = input.target;
+Player.prototype.processInput = function(controller, dt) {
+	var target = controller.get('target');
 	var position = this.position;
 
 	var next = { x: position.x, y: position.y, direction: this.direction };
@@ -74,24 +74,24 @@ Player.prototype.processInput = function(input, dt) {
 		next.x = position.x + d.x * this.speed * dt;
 		next.y = position.y + d.y * this.speed * dt;
 	} else {
-		if(input.shoot && this.ammunition >= 1) {
+		if(controller.get('shoot') && this.ammunition >= 1) {
 			var bullet = new Bullet(this.game, this);
 
 			this.ammunition = 0;
 			this.game.addBody(bullet);
 		}
-		if(input.left) {
+		if(controller.get('left')) {
 			next.direction = this.direction - ROTATION_SPEED * dt;
 		}
-		if(input.right) {
+		if(controller.get('right')) {
 			next.direction = this.direction + ROTATION_SPEED * dt;
 		}
-		if(input.up) {
+		if(controller.get('up')) {
 			var t = math.translate(position, this.direction, this.speed * dt);
 			next.x = t.x;
 			next.y = t.y;
 		}
-		if(input.down) {
+		if(controller.get('down')) {
 			var t = math.translate(position, this.direction + Math.PI, this.speed * dt);
 			next.x = t.x;
 			next.y = t.y;
@@ -116,10 +116,6 @@ Player.prototype.visibilityOf = function(pointOrBody) {
 	if(d > outer) return 0;
 	if(d < inner) return 1;
 	return (1 - (d - inner) / (outer - inner));
-};
-
-Player.prototype.isActive = function() {
-	return this.controller.active();
 };
 
 Player.prototype.toJSON = function() {

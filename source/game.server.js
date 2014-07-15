@@ -20,16 +20,8 @@ var ClientController = function(socket) {
 	});
 };
 
-ClientController.prototype.action = function(name) {
-	return this.updates.length ? this.updates[0].input[name] : false;
-};
-
-ClientController.prototype.target = function() {
-	return this.updates.length ? this.updates[0].input.target : null;
-};
-
-ClientController.prototype.active = function() {
-	return !!this.updates.length;
+ClientController.prototype.get = function(name) {
+	return (this.updates.length && this.updates[0].input[name]) || null;
 };
 
 ClientController.prototype.next = function() {

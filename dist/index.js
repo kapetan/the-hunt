@@ -1012,11 +1012,11 @@ Player.prototype.update = function(dt) {
 	this.footTrack.update(dt);
 	if(this.ammunition < 1) this.ammunition += this.reloadSpeed * dt;
 
-	this.processInput(this.controller.toJSON(), dt);
+	this.processInput(this.controller, dt);
 };
 
-Player.prototype.processInput = function(input, dt) {
-	var target = input.target;
+Player.prototype.processInput = function(controller, dt) {
+	var target = controller.get('target');
 	var position = this.position;
 
 	var next = { x: position.x, y: position.y, direction: this.direction };
@@ -1028,24 +1028,24 @@ Player.prototype.processInput = function(input, dt) {
 		next.x = position.x + d.x * this.speed * dt;
 		next.y = position.y + d.y * this.speed * dt;
 	} else {
-		if(input.shoot && this.ammunition >= 1) {
+		if(controller.get('shoot') && this.ammunition >= 1) {
 			var bullet = new Bullet(this.game, this);
 
 			this.ammunition = 0;
 			this.game.addBody(bullet);
 		}
-		if(input.left) {
+		if(controller.get('left')) {
 			next.direction = this.direction - ROTATION_SPEED * dt;
 		}
-		if(input.right) {
+		if(controller.get('right')) {
 			next.direction = this.direction + ROTATION_SPEED * dt;
 		}
-		if(input.up) {
+		if(controller.get('up')) {
 			var t = math.translate(position, this.direction, this.speed * dt);
 			next.x = t.x;
 			next.y = t.y;
 		}
-		if(input.down) {
+		if(controller.get('down')) {
 			var t = math.translate(position, this.direction + Math.PI, this.speed * dt);
 			next.x = t.x;
 			next.y = t.y;
@@ -1070,10 +1070,6 @@ Player.prototype.visibilityOf = function(pointOrBody) {
 	if(d > outer) return 0;
 	if(d < inner) return 1;
 	return (1 - (d - inner) / (outer - inner));
-};
-
-Player.prototype.isActive = function() {
-	return this.controller.active();
 };
 
 Player.prototype.toJSON = function() {
@@ -1220,6 +1216,7 @@ var MouseController = require('./mouse-controller');
 var append = require('./utils/append');
 var remove = require('./utils/remove');
 var find = require('./utils/find');
+var filter = require('./utils/filter');
 
 var level = require('./levels/level-1');
 
@@ -1235,41 +1232,39 @@ var InputController = function(element) {
 	this.mouse = new MouseController(element);
 };
 
-InputController.prototype.action = function(name) {
-	return this.keyboard.action(name);
-};
-
-InputController.prototype.target = function() {
-	return this.mouse.target();
-};
-
-InputController.prototype.active = function() {
-	return this.keyboard.active() || this.mouse.active();
+InputController.prototype.get = function(name) {
+	return this.keyboard.get(name) || this.mouse.get(name);
 };
 
 InputController.prototype.toJSON = function() {
 	var json = this.keyboard.toJSON();
-	json.target = this.mouse.toJSON().target;
+	json.target = this.mouse.get('target');
 
-	return json;
+	return filter(json, function(key, value) {
+		return value;
+	});
 };
 
 var NoopController = function() {};
 
-NoopController.prototype.action = function() {
-	return false;
-};
-
-NoopController.prototype.target = function() {
-	return false;
-};
-
-NoopController.prototype.active = function() {
-	return false;
+NoopController.prototype.get = function(name) {
+	return null;
 };
 
 NoopController.prototype.toJSON = function() {
 	return {};
+};
+
+var SingleInputController = function(input) {
+	this.input = input;
+};
+
+SingleInputController.prototype.get = function(name) {
+	return this.input[name] || null;
+};
+
+SingleInputController.prototype.toJSON = function() {
+	return this.input;
 };
 
 var Game = function(element) {
@@ -1438,9 +1433,11 @@ Game.prototype._initialize = function(options) {
 		self._time.v += (now - self._time.u);
 		self._time.u = now;
 
-		if(self.player.isActive()) {
+		var input = self.player.controller.toJSON();
+
+		if(Object.keys(input).length) {
 			var update = {
-				input: self.player.controller.toJSON(),
+				input: input,
 				sequence: sequence++,
 				dt: dt
 			};
@@ -1477,7 +1474,7 @@ Game.prototype._reconcileUpdate = function(update) {
 		this.player.direction = local.direction;
 
 		this.inputs.forEach(function(update) {
-			self.player.processInput(update.input, update.dt);
+			self.player.processInput(new SingleInputController(update.input), update.dt);
 		});
 	}
 };
@@ -1510,7 +1507,7 @@ Game.prototype._interpolateUpdates = function() {
 
 module.exports = Game;
 
-},{"./bodies/player":9,"./bodies/rectangle":10,"./keyboard-controller":14,"./levels/level-1":16,"./math":18,"./mouse-controller":19,"./utils/append":20,"./utils/find":21,"./utils/remove":22}],13:[function(require,module,exports){
+},{"./bodies/player":9,"./bodies/rectangle":10,"./keyboard-controller":14,"./levels/level-1":16,"./math":18,"./mouse-controller":19,"./utils/append":20,"./utils/filter":21,"./utils/find":22,"./utils/remove":24}],13:[function(require,module,exports){
 var Game = require('./game.client');
 
 (function() {
@@ -1519,13 +1516,7 @@ var Game = require('./game.client');
 }());
 
 },{"./game.client":12}],14:[function(require,module,exports){
-var ROTATION_SPEED = Math.PI / 800;
-
-var values = function(obj) {
-	return Object.keys(obj).map(function(key) {
-		return obj[key];
-	});
-};
+var map = require('./utils/map');
 
 var Keyboard = function() {
 	var keys = this.keys = {};
@@ -1555,47 +1546,28 @@ Keyboard.prototype.pressed = function(key) {
 	return !!this.keys[key];
 };
 
-Keyboard.prototype.some = function(keys) {
-	var self = this;
-
-	return keys.some(function(key) {
-		return self.pressed(key);
-	});
-};
-
 var KeyboardController = function() {
 	this._keyboard = new Keyboard();
 	this._keyboard.attach();
 };
 
 KeyboardController.ACTIONS = { left: 'left', right: 'right', up: 'up', down: 'down', shoot: 'space' };
-KeyboardController.ACTION_KEYS = values(KeyboardController.ACTIONS);
-KeyboardController.ACTION_NAMES = Object.keys(KeyboardController.ACTIONS);
 
-KeyboardController.prototype.action = function(name) {
-	return this._keyboard.pressed(KeyboardController.ACTIONS[name]);
-};
-
-KeyboardController.prototype.target = function() {
-	return null;
-};
-
-KeyboardController.prototype.active = function() {
-	return this._keyboard.some(KeyboardController.ACTION_KEYS);
+KeyboardController.prototype.get = function(name) {
+	return this._keyboard.pressed(KeyboardController.ACTIONS[name]) || null;
 };
 
 KeyboardController.prototype.toJSON = function() {
 	var self = this;
 
-	return KeyboardController.ACTION_NAMES.reduce(function(acc, key) {
-		acc[key] = self.action(key);
-		return acc;
-	}, {});
+	return map(KeyboardController.ACTIONS, function(key) {
+		return self.get(key);
+	});
 };
 
 module.exports = KeyboardController;
 
-},{}],15:[function(require,module,exports){
+},{"./utils/map":23}],15:[function(require,module,exports){
 var util = require('util');
 
 var DENSITY = 0.1;
@@ -1795,8 +1767,6 @@ exports.lerp = function(p1, p2, t) {
 };
 
 },{}],19:[function(require,module,exports){
-var math = require('./math');
-
 var Mouse = function(element) {
 	this.position = null;
 	this.pressed = false;
@@ -1826,27 +1796,17 @@ var MouseController = function(element) {
 	this._mouse = new Mouse(element);
 };
 
-MouseController.prototype.action = function(name) {
-	return false;
-};
-
-MouseController.prototype.target = function() {
-	return this._mouse.pressed ? this._mouse.position : null;
-};
-
-MouseController.prototype.active = function() {
-	return !!this.target();
+MouseController.prototype.get = function(name) {
+	return (name === 'target' && this._mouse.pressed) ? this._mouse.position : null;
 };
 
 MouseController.prototype.toJSON = function() {
-	return {
-		target: this.target()
-	};
+	return { target: this.get('target') };
 };
 
 module.exports = MouseController;
 
-},{"./math":18}],20:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 module.exports = function(arr, items) {
 	if(!Array.isArray(items)) items = [items];
 
@@ -1856,6 +1816,18 @@ module.exports = function(arr, items) {
 };
 
 },{}],21:[function(require,module,exports){
+module.exports = function(obj, fn) {
+	var result = {};
+
+	Object.keys(obj).forEach(function(key) {
+		var v = fn(key, obj[key], obj);
+		if(v) result[key] = obj[key];
+	});
+
+	return result;
+};
+
+},{}],22:[function(require,module,exports){
 var find = function(arr, fn) {
 	for(var i = 0; i < arr.length; i++) {
 		var item = arr[i];
@@ -1876,7 +1848,24 @@ module.exports = function(arr, obj) {
 	return find(arr, fn);
 };
 
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
+module.exports = function(obj, fn) {
+	var result = {};
+
+	Object.keys(obj).forEach(function(key) {
+		var v = fn(key, obj[key], obj);
+
+		if(Array.isArray(v)) {
+			result[v[0]] = v[1];
+		} else {
+			result[key] = v;
+		}
+	});
+
+	return result;
+};
+
+},{}],24:[function(require,module,exports){
 var remove = function(arr, item) {
 	var i = arr.indexOf(item);
 	if(i >= 0) arr.splice(i, 1);

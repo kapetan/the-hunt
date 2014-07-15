@@ -1,5 +1,3 @@
-var math = require('./math');
-
 var Mouse = function(element) {
 	this.position = null;
 	this.pressed = false;
@@ -29,22 +27,12 @@ var MouseController = function(element) {
 	this._mouse = new Mouse(element);
 };
 
-MouseController.prototype.action = function(name) {
-	return false;
-};
-
-MouseController.prototype.target = function() {
-	return this._mouse.pressed ? this._mouse.position : null;
-};
-
-MouseController.prototype.active = function() {
-	return !!this.target();
+MouseController.prototype.get = function(name) {
+	return (name === 'target' && this._mouse.pressed) ? this._mouse.position : null;
 };
 
 MouseController.prototype.toJSON = function() {
-	return {
-		target: this.target()
-	};
+	return { target: this.get('target') };
 };
 
 module.exports = MouseController;

@@ -1,10 +1,4 @@
-var ROTATION_SPEED = Math.PI / 800;
-
-var values = function(obj) {
-	return Object.keys(obj).map(function(key) {
-		return obj[key];
-	});
-};
+var map = require('./utils/map');
 
 var Keyboard = function() {
 	var keys = this.keys = {};
@@ -34,42 +28,23 @@ Keyboard.prototype.pressed = function(key) {
 	return !!this.keys[key];
 };
 
-Keyboard.prototype.some = function(keys) {
-	var self = this;
-
-	return keys.some(function(key) {
-		return self.pressed(key);
-	});
-};
-
 var KeyboardController = function() {
 	this._keyboard = new Keyboard();
 	this._keyboard.attach();
 };
 
 KeyboardController.ACTIONS = { left: 'left', right: 'right', up: 'up', down: 'down', shoot: 'space' };
-KeyboardController.ACTION_KEYS = values(KeyboardController.ACTIONS);
-KeyboardController.ACTION_NAMES = Object.keys(KeyboardController.ACTIONS);
 
-KeyboardController.prototype.action = function(name) {
-	return this._keyboard.pressed(KeyboardController.ACTIONS[name]);
-};
-
-KeyboardController.prototype.target = function() {
-	return null;
-};
-
-KeyboardController.prototype.active = function() {
-	return this._keyboard.some(KeyboardController.ACTION_KEYS);
+KeyboardController.prototype.get = function(name) {
+	return this._keyboard.pressed(KeyboardController.ACTIONS[name]) || null;
 };
 
 KeyboardController.prototype.toJSON = function() {
 	var self = this;
 
-	return KeyboardController.ACTION_NAMES.reduce(function(acc, key) {
-		acc[key] = self.action(key);
-		return acc;
-	}, {});
+	return map(KeyboardController.ACTIONS, function(key) {
+		return self.get(key);
+	});
 };
 
 module.exports = KeyboardController;
