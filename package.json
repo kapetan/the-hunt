@@ -13,5 +13,9 @@
     "pump": "~0.3.2",
     "after-all": "~1.0.0",
     "chokidar": "~0.8.2"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node watch.js & node server.js"
   }
 }
