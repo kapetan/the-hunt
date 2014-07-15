@@ -195,7 +195,7 @@ Game.prototype._initialize = function(options) {
 		self.updates.push(update);
 
 		self._time.u = Date.now();
-		self._time.v = update.time;
+		self._time.v = update.t;
 
 		if(self.updates.length >= UPDATES_SIZE) {
 			self.updates.shift();
@@ -276,15 +276,15 @@ Game.prototype._interpolateUpdates = function() {
 	var offset = this._time.v - UPDATE_OFFSET;
 
 	var previousUpdate = find(this.updates, function(update, i, updates) {
-		return i < updates.length - 1 && update.time < offset && offset < updates[i + 1].time;
+		return i < updates.length - 1 && update.t < offset && offset < updates[i + 1].t;
 	});
 
 	var nextUpdate = previousUpdate && this.updates[this.updates.indexOf(previousUpdate) + 1];
 
 	if(!previousUpdate || !nextUpdate) return;
 
-	var diff = nextUpdate.time - previousUpdate.time;
-	var progress = diff ? (offset - previousUpdate.time) / diff : 1;
+	var diff = nextUpdate.t - previousUpdate.t;
+	var progress = diff ? (offset - previousUpdate.t) / diff : 1;
 
 	nextUpdate.players.forEach(function(nextPlayer) {
 		var otherPlayer = find(self.others, { id: nextPlayer.id });
