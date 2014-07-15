@@ -30,11 +30,11 @@ app.on('bind', function(address, server) {
 
 	io.on('connection', function(socket) {
 		socket.on('initialize', function(message) {
-			message.id = socket.id;
 			var players = game.players.map(function(player) {
 				return player.toJSON();
 			});
 
+			message.id = socket.id;
 			game.addPlayer(socket, message);
 
 			socket.emit('initialize', { id: socket.id, players: players });
