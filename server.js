@@ -8,7 +8,6 @@ var Game = require('./source/game.server');
 var find = require('./source/utils/find');
 
 var PORT = process.env.PORT || 10103;
-var UPDATE_FREQUENCY = 45;
 
 var app = root();
 var game = new Game({ width: 512, height: 512 });
@@ -51,20 +50,9 @@ app.on('bind', function(address, server) {
 		});
 	});
 
-	setTimeout(function update() {
-		var players = game.players.map(function(player) {
-			return {
-				id: player.id,
-				sequence: player.controller.latestSequence,
-				position: player.position,
-				direction: player.direction
-			};
-		});
-
-		io.emit('update', { players: players, t: Date.now() });
-
-		setTimeout(update, UPDATE_FREQUENCY);
-	}, UPDATE_FREQUENCY);
+	game.on('player_position', function(data) {
+		io.emit('player_position', data);
+	});
 });
 
 app.listen(PORT, function() {

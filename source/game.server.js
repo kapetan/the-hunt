@@ -1,3 +1,6 @@
+var events = require('events');
+var util = require('util');
+
 var Rectangle = require('./bodies/rectangle');
 var Player = require('./bodies/player');
 
@@ -7,6 +10,7 @@ var remove = require('./utils/remove');
 var level = require('./levels/level-1');
 
 var UPDATE_FREQUENCY = 16;
+var EMIT_POSITION_FREQUENCY = 45;
 
 var ClientController = function(socket) {
 	this.socket = socket;
@@ -34,18 +38,23 @@ ClientController.prototype.toJSON = function() {
 };
 
 var Game = function(size) {
+	events.EventEmitter.call(this);
+
 	this.size = size;
 	this.bounds = Rectangle.aligned({ x: 0, y: 0 }, this.size, 0);
 	this.bodies = [];
 	this.players = [];
 
 	this._update = null;
+	this._emitPosition = null;
 
 	this._add = [];
 	this._remove = [];
 
 	this.level = level(this);
 };
+
+util.inherits(Game, events.EventEmitter);
 
 Game.prototype.update = function(dt) {
 	var self = this;
@@ -99,6 +108,20 @@ Game.prototype.start = function() {
 
 		self.update(dt);
 	}, UPDATE_FREQUENCY);
+
+	this._emitPosition = setTimeout(function emit() {
+		var players = self.players.map(function(player) {
+			return {
+				id: player.id,
+				sequence: player.controller.latestSequence,
+				position: player.position,
+				direction: player.direction
+			};
+		});
+
+		self.emit('player_position', { players: players, t: Date.now() });
+		self._emitPosition = setTimeout(emit, EMIT_POSITION_FREQUENCY);
+	}, EMIT_POSITION_FREQUENCY);
 };
 
 Game.prototype.stop = function() {

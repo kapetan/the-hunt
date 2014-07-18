@@ -17,8 +17,6 @@ var UPDATE_FREQUENCY = 16;
 var UPDATES_SIZE = 60 * 2; // 60fps * 2s
 var UPDATE_OFFSET = 100;
 
-var noop = function() {};
-
 var InputController = function(element) {
 	this.keyboard = new KeyboardController();
 	this.mouse = new MouseController(element);
@@ -191,17 +189,17 @@ Game.prototype._initialize = function(options) {
 		self._addOther(other);
 	});
 
-	socket.on('update', function(update) {
-		self.updates.push(update);
+	socket.on('player_position', function(message) {
+		self.updates.push(message);
 
 		self._time.u = Date.now();
-		self._time.v = update.t;
+		self._time.v = message.t;
 
 		if(self.updates.length >= UPDATES_SIZE) {
 			self.updates.shift();
 		}
 
-		self._reconcileUpdate(update);
+		self._reconcileUpdate(message);
 	});
 	socket.on('player_join', function(message) {
 		self._addOther(message);
@@ -220,10 +218,10 @@ Game.prototype._initialize = function(options) {
 		var dt = now - lastTick;
 		lastTick = now;
 
-		self.update(dt);
-
 		self._time.v += (now - self._time.u);
 		self._time.u = now;
+
+		self.update(dt);
 
 		var input = self.player.controller.toJSON();
 
@@ -246,6 +244,8 @@ Game.prototype._initialize = function(options) {
 };
 
 Game.prototype._addOther = function(options) {
+	//options.active = true;
+
 	var remote = new NoopController();
 	var player = new Player(this, remote, options);
 
