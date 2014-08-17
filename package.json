@@ -1,7 +1,7 @@
 {
-  "name": "game",
+  "name": "the-hunt",
   "version": "0.0.1",
-  "description": "",
+  "description": "2D multiplayer game",
   "main": "server.js",
   "dependencies": {
     "root": "~0.7.1",

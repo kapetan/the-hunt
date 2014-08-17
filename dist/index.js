@@ -1660,8 +1660,6 @@ Rectangle.prototype.isPointInside = function(point) {
 module.exports = Rectangle;
 
 },{"../colliding":15,"../math":22}],15:[function(require,module,exports){
-var math = require('./math');
-
 var subtract = function(p1, p2) {
 	return { x: p1.x - p2.x, y: p1.y - p2.y };
 };
@@ -1711,7 +1709,7 @@ module.exports = function(p1, p2) {
 		isOverlaping(subtract(p2[1], p2[2]), p1, p2);
 };
 
-},{"./math":22}],16:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 var Rectangle = require('./bodies/rectangle');
 var Player = require('./bodies/player');
 
