@@ -6,6 +6,7 @@ var Player = require('./bodies/player');
 
 var append = require('./utils/append');
 var remove = require('./utils/remove');
+var find = require('./utils/find');
 
 var level = require('./levels/level-1');
 
@@ -46,7 +47,7 @@ var Game = function(size) {
 	this.players = [];
 
 	this._update = null;
-	this._emitPosition = null;
+	this._state = null;
 
 	this._add = [];
 	this._remove = [];
@@ -85,8 +86,18 @@ Game.prototype.removeBody = function(body) {
 };
 
 Game.prototype.addPlayer = function(socket, options) {
+	var self = this;
 	var controller = new ClientController(socket);
 	var player = new Player(this, controller, options);
+
+	player.on('bullet', function(bullet) {
+		var players = self._getPlayerState();
+		var state = find(players, { id: player.id });
+
+		state.bullet = bullet.toJSON();
+
+		self.emit('player_position', { players: players, t: Date.now() });
+	});
 
 	this.players.push(player);
 	this.addBody(player);
@@ -109,24 +120,20 @@ Game.prototype.start = function() {
 		self.update(dt);
 	}, UPDATE_FREQUENCY);
 
-	this._emitPosition = setTimeout(function emit() {
-		var players = self.players.map(function(player) {
-			return {
-				id: player.id,
-				sequence: player.controller.latestSequence,
-				position: player.position,
-				direction: player.direction
-			};
-		});
+	this._state = setTimeout(function emit() {
+		var players = self._getPlayerState();
 
 		self.emit('player_position', { players: players, t: Date.now() });
-		self._emitPosition = setTimeout(emit, EMIT_POSITION_FREQUENCY);
+		self._state = setTimeout(emit, EMIT_POSITION_FREQUENCY);
 	}, EMIT_POSITION_FREQUENCY);
 };
 
 Game.prototype.stop = function() {
 	clearInterval(this._update);
+	clearTimeout(this._state);
+
 	this._update = null;
+	this._state = null;
 };
 
 Game.prototype.getCollisions = function(rectangle, ignore) {
@@ -138,6 +145,17 @@ Game.prototype.getCollisions = function(rectangle, ignore) {
 
 Game.prototype.inBounds = function(rectangle) {
 	return this.bounds.isRectangleInside(rectangle);
+};
+
+Game.prototype._getPlayerState = function() {
+	return this.players.map(function(player) {
+		return {
+			id: player.id,
+			sequence: player.controller.latestSequence,
+			position: player.position,
+			direction: player.direction
+		};
+	});
 };
 
 module.exports = Game;

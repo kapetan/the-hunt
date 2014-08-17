@@ -1,6 +1,12 @@
+var qs = require('querystring');
 var Game = require('./game.client');
 
-(function() {
-	var game = window.game = new Game('canvas');
-	game.start();
-}());
+var options = qs.parse(window
+		.location
+		.search
+		.replace(/^\?/, ''));
+
+var game = new Game('canvas', options);
+game.start();
+
+window.game = game;

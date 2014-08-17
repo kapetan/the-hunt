@@ -57,7 +57,8 @@ SingleInputController.prototype.toJSON = function() {
 	return this.input;
 };
 
-var Game = function(element) {
+var Game = function(element, options) {
+	this._options = options || {};
 	element = document.getElementById(element);
 
 	this.canvas = element.getContext('2d');
@@ -112,7 +113,7 @@ Game.prototype.draw = function() {
 	var self = this;
 
 	this.bodies.forEach(function(body) {
-		if(body.active) {
+		if(body.active && !self._options.debug) {
 			var visibility = body.visibility * self.player.visibilityOf(body);
 			if(visibility > 0) body.draw({ visibility: visibility });
 		} else {
@@ -244,7 +245,7 @@ Game.prototype._initialize = function(options) {
 };
 
 Game.prototype._addOther = function(options) {
-	//options.active = true;
+	options.active = true;
 
 	var remote = new NoopController();
 	var player = new Player(this, remote, options);
@@ -293,6 +294,11 @@ Game.prototype._interpolateUpdates = function() {
 		if(otherPlayer && previousPlayer) {
 			otherPlayer.position = math.lerp(previousPlayer.position, nextPlayer.position, progress);
 			otherPlayer.direction = (nextPlayer.direction - previousPlayer.direction) * progress + nextPlayer.direction;
+
+			if(nextPlayer.bullet) {
+				otherPlayer.shoot(nextPlayer.bullet);
+				nextPlayer.bullet = null;
+			}
 		}
 	});
 };

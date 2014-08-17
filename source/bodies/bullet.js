@@ -70,16 +70,22 @@ Particle.prototype.isVisible = function() {
 	return this.size.width > 0 && this.size.height > 0;
 };
 
-var Bullet = function(game, player) {
+var Bullet = function(game, player, options) {
 	this.game = game;
 	this.player = player;
+
+	options = extend({
+		position: player.position,
+		direction: player.direction,
+		visibility: 1
+	}, options || {});
 
 	this.active = true;
 	this.collidable = true;
 
-	this.position = { x: player.position.x, y: player.position.y };
-	this.direction = player.direction;
-	this.visibility = 1;
+	this.position = { x: options.position.x, y: options.position.y };
+	this.direction = options.direction;
+	this.visibility = options.visibility;
 };
 
 Bullet.prototype.update = function(dt) {
@@ -114,6 +120,10 @@ Bullet.prototype.draw = function(options) {
 
 Bullet.prototype.getRectangle = function() {
 	return new Rectangle(this.position, { width: 2 * RADIUS, height: 2 * RADIUS }, this.direction);
+};
+
+Bullet.prototype.toJSON = function() {
+	return { position: this.position, direction: this.direction };
 };
 
 module.exports = Bullet;
