@@ -36,7 +36,7 @@ app.on('bind', function(address, server) {
 			message.id = socket.id;
 			game.addPlayer(socket, message);
 
-			socket.emit('initialize', { id: socket.id, players: players });
+			socket.emit('initialize', { id: socket.id, players: players, t: Date.now() });
 			socket.broadcast.emit('player_join', message);
 		});
 
@@ -45,7 +45,7 @@ app.on('bind', function(address, server) {
 
 			if(player) {
 				game.removePlayer(player);
-				socket.broadcast.emit('player_leave', { id: socket.id });
+				socket.broadcast.emit('player_leave', { id: socket.id, t: Date.now() });
 			}
 		});
 	});

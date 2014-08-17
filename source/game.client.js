@@ -185,6 +185,7 @@ Game.prototype._initialize = function(options) {
 	var sequence = 0;
 
 	this.player.id = options.id;
+	this._time = { u: Date.now(), v: options.t };
 
 	options.players.forEach(function(other) {
 		self._addOther(other);
@@ -192,9 +193,6 @@ Game.prototype._initialize = function(options) {
 
 	socket.on('player_position', function(message) {
 		self.updates.push(message);
-
-		self._time.u = Date.now();
-		self._time.v = message.t;
 
 		if(self.updates.length >= UPDATES_SIZE) {
 			self.updates.shift();
