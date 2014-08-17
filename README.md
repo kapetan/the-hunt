@@ -1,4 +1,4 @@
-# the-hunt
+# The hunt
 
 A small 2D multiplayer game written in Javascript for moderne browsers which support the `canvas` and `requestAnimationFrame` APIs.
 
