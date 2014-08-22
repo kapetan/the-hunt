@@ -13,13 +13,9 @@ var app = root();
 var io = socketio(app);
 var game = new Game({ width: 512, height: 512 });
 
-app.get('/', function(request, response) {
-	response.redirect('/dist/index.html');
-});
-
 app.get('{*}', function(request, response) {
 	send(request, request.params.glob)
-		.root(__dirname)
+		.root(path.join(__dirname, 'dist'))
 		.pipe(response);
 });
 
