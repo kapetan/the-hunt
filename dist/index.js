@@ -1332,7 +1332,7 @@ var Bullet = function(game, player, options) {
 	this.active = true;
 	this.collidable = true;
 
-	this.position = { x: options.position.x, y: options.position.y };
+	this.position = math.translate(options.position, options.direction, player.size.width / 2 + RADIUS + 1);
 	this.direction = options.direction;
 	this.visibility = options.visibility;
 };
