@@ -1190,268 +1190,6 @@ function extend() {
 
 },{}],10:[function(require,module,exports){
 var util = require('util');
-var events = require('events');
-var extend = require('xtend');
-
-var math = require('../math');
-var Rectangle = require('./rectangle');
-
-var COLOR = [0, 0, 0];
-
-var rgba = function(color, alpha) {
-	return util.format('rgba(%s, %s, %s, %s)', color[0], color[1], color[2], alpha);
-};
-
-var Base = function(game, options) {
-	events.EventEmitter.call(this);
-
-	options = options || {};
-
-	this.game = game;
-
-	this.position = options.position || { x: 0, y: 0 };
-	this.size = options.size || { width: 0, height: 0 };
-	this.direction = options.direction || 0;
-	this.visibility = (options.visibility === undefined) ? 1 : options.visibility;
-	this.color = options.color || COLOR;
-};
-
-util.inherits(Base, events.EventEmitter);
-
-Base.prototype.getRectangle = function() {
-	return new Rectangle(this.position, this.size, this.direction);
-};
-
-Base.prototype.update = function(dt) {};
-
-Base.prototype.draw = function(options) {
-	var canvas = this.game.canvas;
-
-	options = extend(this, options || {});
-	if(options.visibility - Math.pow(10, -10) <= 0) return;
-	if(options.size.width <= 0 || options.size.height <= 0) return;
-
-	canvas.save();
-	canvas.translate(options.position.x, options.position.y);
-	canvas.rotate(options.direction);
-	canvas.fillStyle = rgba(options.color, options.visibility);
-	canvas.fillRect(-options.size.width / 2, -options.size.height / 2, options.size.width, options.size.height);
-	canvas.restore();
-};
-
-Base.prototype.distanceTo = function(bodyOrPoint) {
-	var point = bodyOrPoint.position ? bodyOrPoint.position : bodyOrPoint;
-	return math.distance(point, this.position);
-};
-
-module.exports = Base;
-
-},{"../math":22,"./rectangle":14,"events":1,"util":8,"xtend":9}],11:[function(require,module,exports){
-var util = require('util');
-var extend = require('xtend');
-
-var math = require('../math');
-var Base = require('./base');
-var Rectangle = require('./rectangle');
-
-var RADIUS = 4;
-var SPEED = 0.5;
-
-var PARTICLE_COUNT = 10;
-var MIN_PARTICLE_SIZE = 5;
-var MAX_PARTICLE_SIZE = 10;
-var MIN_PARTICLE_SPEED = 0.06;
-var MAX_PARTICLE_SPEED = 0.2;
-var MIN_PARTICLE_SCALE = 0.01;
-var MAX_PARTICLE_SCALE = 0.04;
-var MIN_PARTICLE_ANGLE = -0.1;
-var MAX_PARTICLE_ANGLE = 0.1;
-
-var rand = function(min, max) {
-	return min + Math.random() * (max - min);
-};
-
-var explosion = function(game, position, color) {
-	for(var i = 0; i < 2 * Math.PI; i += Math.round(2 * Math.PI / PARTICLE_COUNT)) {
-		var size = rand(MIN_PARTICLE_SIZE, MAX_PARTICLE_SIZE);
-		var scale = rand(MIN_PARTICLE_SCALE, MAX_PARTICLE_SCALE);
-		var speed = rand(MIN_PARTICLE_SPEED, MAX_PARTICLE_SPEED);
-		var direction = i + rand(MIN_PARTICLE_ANGLE, MAX_PARTICLE_ANGLE);
-
-		var particle = new Particle(game, {
-			position: { x: position.x, y: position.y },
-			size: { width: size, height: size },
-			direction: direction,
-			color: color,
-			scale: scale,
-			speed: speed
-		});
-
-		game.addBody(particle);
-	}
-};
-
-var Particle = function(game, options) {
-	Base.call(this, game, options);
-
-	this.active = true;
-	this.collidable = false;
-
-	this.speed = options.speed;
-	this.scale = options.scale;
-};
-
-util.inherits(Particle, Base);
-
-Particle.prototype.update = function(dt) {
-	var next = math.translate(this.position, this.direction, this.speed * dt);
-
-	this.position.x = next.x;
-	this.position.y = next.y;
-
-	this.size.width -= this.scale * dt;
-	this.size.height -= this.scale * dt;
-
-	if(!this.isVisible()) this.game.removeBody(this);
-};
-
-Particle.prototype.isVisible = function() {
-	return this.size.width > 0 && this.size.height > 0;
-};
-
-var Bullet = function(game, player, options) {
-	this.game = game;
-	this.player = player;
-
-	options = extend({
-		position: player.position,
-		direction: player.direction,
-		visibility: 1
-	}, options || {});
-
-	this.active = true;
-	this.collidable = true;
-
-	this.position = math.translate(options.position, options.direction, player.size.width / 2 + RADIUS + 1);
-	this.direction = options.direction;
-	this.visibility = options.visibility;
-};
-
-Bullet.prototype.update = function(dt) {
-	var game = this.game;
-	var bounds = this.getRectangle();
-
-	if(!game.inBounds(bounds) || game.getCollisions(bounds, [this, this.player]).length) {
-		explosion(game, this.position);
-		explosion(game, this.position, [255, 163, 18]);
-
-		game.removeBody(this);
-	} else {
-		var next = math.translate(this.position, this.direction, SPEED * dt);
-
-		this.position.x = next.x;
-		this.position.y = next.y;
-	}
-};
-
-Bullet.prototype.draw = function(options) {
-	var canvas = this.game.canvas;
-
-	options = extend(this, options || {});
-
-	canvas.save();
-	canvas.beginPath();
-	canvas.arc(this.position.x, this.position.y, RADIUS, 0, 2 * Math.PI);
-	canvas.fillStyle = util.format('rgba(0, 0, 0, %s)', options.visibility);
-	canvas.fill();
-	canvas.restore();
-};
-
-Bullet.prototype.getRectangle = function() {
-	return new Rectangle(this.position, { width: 2 * RADIUS, height: 2 * RADIUS }, this.direction);
-};
-
-Bullet.prototype.toJSON = function() {
-	return { position: this.position, direction: this.direction };
-};
-
-module.exports = Bullet;
-
-},{"../math":22,"./base":10,"./rectangle":14,"util":8,"xtend":9}],12:[function(require,module,exports){
-var util = require('util');
-
-var math = require('../math');
-var Base = require('./base');
-
-var FOOT_SIZE = { width: 8, height: 5 };
-var FOOT_SLANT = 0.2;
-var FOOT_DECAY = 0.0001;
-var STRIDE_LENGTH = 15;
-var FOOT_LENGTH = 4;
-
-var FootStep = function(game, options) {
-	options = options || {};
-	options.size = FOOT_SIZE;
-	options.direction += (options.isLeft ? -1 : 1) * FOOT_SLANT;
-
-	Base.call(this, game, options);
-
-	this.active = true;
-	this.collidable = false;
-
-	this.decay = (options.decay === undefined) ? FOOT_DECAY : options.decay;
-	this.isLeft = !!options.isLeft;
-	this.isRight = !options.isLeft;
-};
-
-util.inherits(FootStep, Base);
-
-FootStep.prototype.update = function(dt) {
-	this.visibility -= this.decay * dt;
-	if(!this.isVisible()) this.game.removeBody(this);
-};
-
-FootStep.prototype.isVisible = function() {
-	return this.visibility > 0;
-};
-
-var FootTrack = function(game, player) {
-	this.game = game;
-	this.player = player;
-
-	this.latestLeft = false;
-	this.latestPosition = { x: player.position.x, y: player.position.y };
-	this.latestDirection = player.direction;
-};
-
-FootTrack.prototype.update = function(dt) {
-	if(math.distance(this.player.position, this.latestPosition) >= STRIDE_LENGTH) {
-		var step;
-
-		if(this.latestLeft) {
-			step = math.translate(this.latestPosition, this.latestDirection + Math.PI / 2, FOOT_LENGTH);
-		} else {
-			step = math.translate(this.latestPosition, this.latestDirection - Math.PI / 2, FOOT_LENGTH);
-		}
-
-		step = new FootStep(this.game, {
-			position: step,
-			direction: this.latestDirection,
-			isLeft: !this.latestLeft
-		});
-
-		this.game.addBody(step);
-
-		this.latestLeft = !this.latestLeft;
-		this.latestPosition = { x: this.player.position.x, y: this.player.position.y };
-		this.latestDirection = this.player.direction;
-	}
-};
-
-module.exports = FootTrack;
-
-},{"../math":22,"./base":10,"util":8}],13:[function(require,module,exports){
-var util = require('util');
 var extend = require('xtend');
 
 var math = require('../math');
@@ -1584,7 +1322,341 @@ Player.prototype.toJSON = function() {
 
 module.exports = Player;
 
-},{"../math":22,"./base":10,"./bullet":11,"./foot-track":12,"./rectangle":14,"util":8,"xtend":9}],14:[function(require,module,exports){
+},{"../math":25,"./base":11,"./bullet":12,"./foot-track":13,"./rectangle":16,"util":8,"xtend":9}],11:[function(require,module,exports){
+var util = require('util');
+var events = require('events');
+var extend = require('xtend');
+
+var math = require('../math');
+var Rectangle = require('./rectangle');
+
+var COLOR = [0, 0, 0];
+
+var rgba = function(color, alpha) {
+	return util.format('rgba(%s, %s, %s, %s)', color[0], color[1], color[2], alpha);
+};
+
+var Base = function(game, options) {
+	events.EventEmitter.call(this);
+
+	options = options || {};
+
+	this.game = game;
+
+	this.position = options.position || { x: 0, y: 0 };
+	this.size = options.size || { width: 0, height: 0 };
+	this.direction = options.direction || 0;
+	this.visibility = (options.visibility === undefined) ? 1 : options.visibility;
+	this.color = options.color || COLOR;
+};
+
+util.inherits(Base, events.EventEmitter);
+
+Base.prototype.getRectangle = function() {
+	return new Rectangle(this.position, this.size, this.direction);
+};
+
+Base.prototype.update = function(dt) {};
+
+Base.prototype.draw = function(options) {
+	var canvas = this.game.canvas;
+
+	options = extend(this, options || {});
+	if(options.visibility - Math.pow(10, -10) <= 0) return;
+	if(options.size.width <= 0 || options.size.height <= 0) return;
+
+	canvas.save();
+	canvas.translate(options.position.x, options.position.y);
+	canvas.rotate(options.direction);
+	canvas.fillStyle = rgba(options.color, options.visibility);
+	canvas.fillRect(-options.size.width / 2, -options.size.height / 2, options.size.width, options.size.height);
+	canvas.restore();
+};
+
+Base.prototype.distanceTo = function(bodyOrPoint) {
+	var point = bodyOrPoint.position ? bodyOrPoint.position : bodyOrPoint;
+	return math.distance(point, this.position);
+};
+
+module.exports = Base;
+
+},{"../math":25,"./rectangle":16,"events":1,"util":8,"xtend":9}],12:[function(require,module,exports){
+var util = require('util');
+var extend = require('xtend');
+
+var math = require('../math');
+var Base = require('./base');
+var Rectangle = require('./rectangle');
+
+var RADIUS = 4;
+var SPEED = 0.5;
+
+var PARTICLE_COUNT = 10;
+var MIN_PARTICLE_SIZE = 5;
+var MAX_PARTICLE_SIZE = 10;
+var MIN_PARTICLE_SPEED = 0.06;
+var MAX_PARTICLE_SPEED = 0.2;
+var MIN_PARTICLE_SCALE = 0.01;
+var MAX_PARTICLE_SCALE = 0.04;
+var MIN_PARTICLE_ANGLE = -0.1;
+var MAX_PARTICLE_ANGLE = 0.1;
+
+var rand = function(min, max) {
+	return min + Math.random() * (max - min);
+};
+
+var explosion = function(game, position, color) {
+	for(var i = 0; i < 2 * Math.PI; i += Math.round(2 * Math.PI / PARTICLE_COUNT)) {
+		var size = rand(MIN_PARTICLE_SIZE, MAX_PARTICLE_SIZE);
+		var scale = rand(MIN_PARTICLE_SCALE, MAX_PARTICLE_SCALE);
+		var speed = rand(MIN_PARTICLE_SPEED, MAX_PARTICLE_SPEED);
+		var direction = i + rand(MIN_PARTICLE_ANGLE, MAX_PARTICLE_ANGLE);
+
+		var particle = new Particle(game, {
+			position: { x: position.x, y: position.y },
+			size: { width: size, height: size },
+			direction: direction,
+			color: color,
+			scale: scale,
+			speed: speed
+		});
+
+		game.addBody(particle);
+	}
+};
+
+var Particle = function(game, options) {
+	Base.call(this, game, options);
+
+	this.active = true;
+	this.collidable = false;
+
+	this.speed = options.speed;
+	this.scale = options.scale;
+};
+
+util.inherits(Particle, Base);
+
+Particle.prototype.update = function(dt) {
+	var next = math.translate(this.position, this.direction, this.speed * dt);
+
+	this.position.x = next.x;
+	this.position.y = next.y;
+
+	this.size.width -= this.scale * dt;
+	this.size.height -= this.scale * dt;
+
+	if(!this.isVisible()) this.game.removeBody(this);
+};
+
+Particle.prototype.isVisible = function() {
+	return this.size.width > 0 && this.size.height > 0;
+};
+
+var Bullet = function(game, player, options) {
+	this.game = game;
+	this.player = player;
+
+	options = extend({
+		position: player.position,
+		direction: player.direction,
+		visibility: 1
+	}, options || {});
+
+	this.active = true;
+	this.collidable = true;
+
+	this.position = math.translate(options.position, options.direction, player.size.width / 2 + RADIUS + 1);
+	this.direction = options.direction;
+	this.visibility = options.visibility;
+};
+
+Bullet.prototype.update = function(dt) {
+	var game = this.game;
+	var bounds = this.getRectangle();
+
+	if(!game.inBounds(bounds) || game.getCollisions(bounds, [this, this.player]).length) {
+		explosion(game, this.position);
+		explosion(game, this.position, [255, 163, 18]);
+
+		game.removeBody(this);
+	} else {
+		var next = math.translate(this.position, this.direction, SPEED * dt);
+
+		this.position.x = next.x;
+		this.position.y = next.y;
+	}
+};
+
+Bullet.prototype.draw = function(options) {
+	var canvas = this.game.canvas;
+
+	options = extend(this, options || {});
+
+	canvas.save();
+	canvas.beginPath();
+	canvas.arc(this.position.x, this.position.y, RADIUS, 0, 2 * Math.PI);
+	canvas.fillStyle = util.format('rgba(0, 0, 0, %s)', options.visibility);
+	canvas.fill();
+	canvas.restore();
+};
+
+Bullet.prototype.getRectangle = function() {
+	return new Rectangle(this.position, { width: 2 * RADIUS, height: 2 * RADIUS }, this.direction);
+};
+
+Bullet.prototype.toJSON = function() {
+	return { position: this.position, direction: this.direction };
+};
+
+module.exports = Bullet;
+
+},{"../math":25,"./base":11,"./rectangle":16,"util":8,"xtend":9}],13:[function(require,module,exports){
+var util = require('util');
+
+var math = require('../math');
+var Base = require('./base');
+
+var FOOT_SIZE = { width: 8, height: 5 };
+var FOOT_SLANT = 0.2;
+var FOOT_DECAY = 0.0001;
+var STRIDE_LENGTH = 15;
+var FOOT_LENGTH = 4;
+
+var FootStep = function(game, options) {
+	options = options || {};
+	options.size = FOOT_SIZE;
+	options.direction += (options.isLeft ? -1 : 1) * FOOT_SLANT;
+
+	Base.call(this, game, options);
+
+	this.active = true;
+	this.collidable = false;
+
+	this.decay = (options.decay === undefined) ? FOOT_DECAY : options.decay;
+	this.isLeft = !!options.isLeft;
+	this.isRight = !options.isLeft;
+};
+
+util.inherits(FootStep, Base);
+
+FootStep.prototype.update = function(dt) {
+	this.visibility -= this.decay * dt;
+	if(!this.isVisible()) this.game.removeBody(this);
+};
+
+FootStep.prototype.isVisible = function() {
+	return this.visibility > 0;
+};
+
+var FootTrack = function(game, player) {
+	this.game = game;
+	this.player = player;
+
+	this.latestLeft = false;
+	this.latestPosition = { x: player.position.x, y: player.position.y };
+	this.latestDirection = player.direction;
+};
+
+FootTrack.prototype.update = function(dt) {
+	if(math.distance(this.player.position, this.latestPosition) >= STRIDE_LENGTH) {
+		var step;
+
+		if(this.latestLeft) {
+			step = math.translate(this.latestPosition, this.latestDirection + Math.PI / 2, FOOT_LENGTH);
+		} else {
+			step = math.translate(this.latestPosition, this.latestDirection - Math.PI / 2, FOOT_LENGTH);
+		}
+
+		step = new FootStep(this.game, {
+			position: step,
+			direction: this.latestDirection,
+			isLeft: !this.latestLeft
+		});
+
+		this.game.addBody(step);
+
+		this.latestLeft = !this.latestLeft;
+		this.latestPosition = { x: this.player.position.x, y: this.player.position.y };
+		this.latestDirection = this.player.direction;
+	}
+};
+
+module.exports = FootTrack;
+
+},{"../math":25,"./base":11,"util":8}],14:[function(require,module,exports){
+var util = require('util');
+
+var Player = require('./player');
+var find = require('../utils/find');
+
+var SingleInputController = function(input) {
+	this.input = input;
+};
+
+SingleInputController.prototype.get = function(name) {
+	return this.input[name] || null;
+};
+
+SingleInputController.prototype.toJSON = function() {
+	return this.input;
+};
+
+var LocalPlayer = function() {
+	Player.apply(this, arguments);
+
+	this.inputs = [];
+	this.pending = null;
+	this.sequence = 0;
+};
+
+util.inherits(LocalPlayer, Player);
+
+LocalPlayer.prototype.update = function(dt) {
+	Player.prototype.update.call(this, dt);
+
+	var input = this.controller.toJSON();
+
+	if(Object.keys(input).length) {
+		var sequence = this.sequence++;
+		var update = {
+			input: input,
+			sequence: sequence,
+			dt: dt
+		};
+
+		this.inputs.push(update);
+		this.pending = update;
+	}
+};
+
+LocalPlayer.prototype.empty = function() {
+	var pending = this.pending;
+	this.pending = null;
+
+	return pending;
+};
+
+LocalPlayer.prototype.reconcile = function(update) {
+	var self = this;
+	var latest = find(this.inputs, { sequence: update.sequence });
+	var index = this.inputs.indexOf(latest);
+
+	this.inputs.splice(0, index + 1);
+
+	this.position = update.position;
+	this.direction = update.direction;
+
+	this.inputs.forEach(function(i) {
+		self.processInput(new SingleInputController(i.input), i.dt);
+	});
+};
+
+module.exports = LocalPlayer;
+
+},{"../utils/find":29,"./player":15,"util":8}],15:[function(require,module,exports){
+module.exports=require(10)
+},{"../math":25,"./base":11,"./bullet":12,"./foot-track":13,"./rectangle":16,"util":8,"xtend":9}],16:[function(require,module,exports){
 var math = require('../math');
 var colliding = require('../colliding');
 
@@ -1659,7 +1731,70 @@ Rectangle.prototype.isPointInside = function(point) {
 
 module.exports = Rectangle;
 
-},{"../colliding":15,"../math":22}],15:[function(require,module,exports){
+},{"../colliding":18,"../math":25}],17:[function(require,module,exports){
+var util = require('util');
+
+var Player = require('./Player');
+var math = require('../math');
+
+var UPDATES_SIZE = 60 * 2;
+
+var NoopController = function() {};
+
+NoopController.prototype.get = function(name) {
+	return null;
+};
+
+NoopController.prototype.toJSON = function() {
+	return {};
+};
+
+var RemotePlayer = function(game, options) {
+	Player.call(this, game, new NoopController(), options);
+
+	this.updates = [];
+};
+
+util.inherits(RemotePlayer, Player);
+
+RemotePlayer.prototype.addUpdate = function(update) {
+	this.updates.push(update);
+
+	if(this.updates.length >= UPDATES_SIZE) {
+		this.updates.shift();
+	}
+};
+
+RemotePlayer.prototype.interpolate = function(time) {
+	var updates = this._getUpdates(time);
+	if(!updates) return;
+
+	var next = updates.next;
+	var previous = updates.previous;
+
+	var diff = next.t - previous.t;
+	var progress = diff ? (time - previous.t) / diff : 1;
+
+	this.position = math.lerp(previous.position, next.position, progress);
+	this.direction = (next.direction - previous.direction) * progress + next.direction;
+};
+
+RemotePlayer.prototype._getUpdates = function(time) {
+	var updates = this.updates;
+
+	for(var i = 0; i < updates.length - 1; i++) {
+		if(updates[i].t < time && time < updates[i + 1].t) {
+			return {
+				next: updates[i],
+				previous: updates[i + 1]
+			};
+		}
+	}
+};
+
+module.exports = RemotePlayer;
+
+},{"../math":25,"./Player":10,"util":8}],18:[function(require,module,exports){
 var subtract = function(p1, p2) {
 	return { x: p1.x - p2.x, y: p1.y - p2.y };
 };
@@ -1709,11 +1844,11 @@ module.exports = function(p1, p2) {
 		isOverlaping(subtract(p2[1], p2[2]), p1, p2);
 };
 
-},{}],16:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 var Rectangle = require('./bodies/rectangle');
-var Player = require('./bodies/player');
+var LocalPlayer = require('./bodies/local-player.client');
+var RemotePlayer = require('./bodies/remote-player.client');
 
-var math = require('./math');
 var KeyboardController = require('./keyboard-controller');
 var MouseController = require('./mouse-controller');
 
@@ -1726,7 +1861,6 @@ var level = require('./levels/level-1');
 
 var CLEAR_RADIUS = 40;
 var UPDATE_FREQUENCY = 16;
-var UPDATES_SIZE = 60 * 2; // 60fps * 2s
 var UPDATE_OFFSET = 100;
 
 var InputController = function(element) {
@@ -1747,28 +1881,6 @@ InputController.prototype.toJSON = function() {
 	});
 };
 
-var NoopController = function() {};
-
-NoopController.prototype.get = function(name) {
-	return null;
-};
-
-NoopController.prototype.toJSON = function() {
-	return {};
-};
-
-var SingleInputController = function(input) {
-	this.input = input;
-};
-
-SingleInputController.prototype.get = function(name) {
-	return this.input[name] || null;
-};
-
-SingleInputController.prototype.toJSON = function() {
-	return this.input;
-};
-
 var Game = function(element, options) {
 	this._options = options || {};
 	element = document.getElementById(element);
@@ -1779,9 +1891,6 @@ var Game = function(element, options) {
 
 	this.bodies = [];
 	this.others = [];
-
-	this.updates = [];
-	this.inputs = [];
 
 	this._animation = null;
 	this._update = null;
@@ -1795,7 +1904,7 @@ var Game = function(element, options) {
 
 	var input = new InputController(element);
 
-	this.player = new Player(this, input, {
+	this.player = new LocalPlayer(this, input, {
 		position: this.getAvailablePosition({ width: CLEAR_RADIUS, height: CLEAR_RADIUS }, 0)
 	});
 
@@ -1816,7 +1925,11 @@ Game.prototype.update = function(dt) {
 		body.update(dt);
 	});
 
-	this._interpolateUpdates();
+	var time = this._time.v - UPDATE_OFFSET;
+
+	this.others.forEach(function(other) {
+		other.interpolate(time);
+	});
 };
 
 Game.prototype.draw = function() {
@@ -1894,7 +2007,6 @@ Game.prototype._initialize = function(options) {
 	var self = this;
 	var socket = this._socket;
 	var lastTick = Date.now();
-	var sequence = 0;
 
 	this.player.id = options.id;
 	this._time = { u: Date.now(), v: options.t };
@@ -1904,13 +2016,17 @@ Game.prototype._initialize = function(options) {
 	});
 
 	socket.on('player_position', function(message) {
-		self.updates.push(message);
+		var update = find(message.players, { id: self.player.id });
+		if(update) self.player.reconcile(update);
 
-		if(self.updates.length >= UPDATES_SIZE) {
-			self.updates.shift();
-		}
+		self.others.forEach(function(other) {
+			var update = find(message.players, { id: other.id });
 
-		self._reconcileUpdate(message);
+			if(update) {
+				update.t = message.t;
+				other.addUpdate(update);
+			}
+		});
 	});
 	socket.on('player_join', function(message) {
 		self._addOther(message);
@@ -1934,16 +2050,9 @@ Game.prototype._initialize = function(options) {
 
 		self.update(dt);
 
-		var input = self.player.controller.toJSON();
+		var update = self.player.empty();
 
-		if(Object.keys(input).length) {
-			var update = {
-				input: input,
-				sequence: sequence++,
-				dt: dt
-			};
-
-			self.inputs.push(update);
+		if(update) {
 			socket.emit('update', update);
 		}
 	}, UPDATE_FREQUENCY);
@@ -1957,65 +2066,15 @@ Game.prototype._initialize = function(options) {
 Game.prototype._addOther = function(options) {
 	options.active = true;
 
-	var remote = new NoopController();
-	var player = new Player(this, remote, options);
+	var player = new RemotePlayer(this, options);
 
 	this.addBody(player);
 	this.others.push(player);
 };
 
-Game.prototype._reconcileUpdate = function(update) {
-	var self = this;
-	var local = find(update.players, { id: this.player.id });
-	var latestInput = find(this.inputs, { sequence: local.sequence });
-	var latestIndex = this.inputs.indexOf(latestInput);
-
-	if(latestIndex >= 0) {
-		this.inputs.splice(0, latestIndex + 1);
-
-		this.player.position = local.position;
-		this.player.direction = local.direction;
-
-		this.inputs.forEach(function(update) {
-			self.player.processInput(new SingleInputController(update.input), update.dt);
-		});
-	}
-};
-
-Game.prototype._interpolateUpdates = function() {
-	var self = this;
-	var offset = this._time.v - UPDATE_OFFSET;
-
-	var previousUpdate = find(this.updates, function(update, i, updates) {
-		return i < updates.length - 1 && update.t < offset && offset < updates[i + 1].t;
-	});
-
-	var nextUpdate = previousUpdate && this.updates[this.updates.indexOf(previousUpdate) + 1];
-
-	if(!previousUpdate || !nextUpdate) return;
-
-	var diff = nextUpdate.t - previousUpdate.t;
-	var progress = diff ? (offset - previousUpdate.t) / diff : 1;
-
-	nextUpdate.players.forEach(function(nextPlayer) {
-		var otherPlayer = find(self.others, { id: nextPlayer.id });
-		var previousPlayer = find(previousUpdate.players, { id: nextPlayer.id });
-
-		if(otherPlayer && previousPlayer) {
-			otherPlayer.position = math.lerp(previousPlayer.position, nextPlayer.position, progress);
-			otherPlayer.direction = (nextPlayer.direction - previousPlayer.direction) * progress + nextPlayer.direction;
-
-			if(nextPlayer.bullet) {
-				otherPlayer.shoot(nextPlayer.bullet);
-				nextPlayer.bullet = null;
-			}
-		}
-	});
-};
-
 module.exports = Game;
 
-},{"./bodies/player":13,"./bodies/rectangle":14,"./keyboard-controller":18,"./levels/level-1":20,"./math":22,"./mouse-controller":23,"./utils/append":24,"./utils/filter":25,"./utils/find":26,"./utils/remove":28}],17:[function(require,module,exports){
+},{"./bodies/local-player.client":14,"./bodies/rectangle":16,"./bodies/remote-player.client":17,"./keyboard-controller":21,"./levels/level-1":23,"./mouse-controller":26,"./utils/append":27,"./utils/filter":28,"./utils/find":29,"./utils/remove":31}],20:[function(require,module,exports){
 var qs = require('querystring');
 var Game = require('./game.client');
 
@@ -2029,7 +2088,7 @@ game.start();
 
 window.game = game;
 
-},{"./game.client":16,"querystring":6}],18:[function(require,module,exports){
+},{"./game.client":19,"querystring":6}],21:[function(require,module,exports){
 var map = require('./utils/map');
 
 var Keyboard = function() {
@@ -2081,7 +2140,7 @@ KeyboardController.prototype.toJSON = function() {
 
 module.exports = KeyboardController;
 
-},{"./utils/map":27}],19:[function(require,module,exports){
+},{"./utils/map":30}],22:[function(require,module,exports){
 var util = require('util');
 
 var DENSITY = 0.1;
@@ -2141,7 +2200,7 @@ Fog.prototype.reveal = function(body) {
 
 module.exports = Fog;
 
-},{"util":8}],20:[function(require,module,exports){
+},{"util":8}],23:[function(require,module,exports){
 var wall = require('./wall');
 var Fog = require('./fog');
 
@@ -2157,7 +2216,7 @@ module.exports = function(game) {
 	};
 };
 
-},{"./fog":19,"./wall":21}],21:[function(require,module,exports){
+},{"./fog":22,"./wall":24}],24:[function(require,module,exports){
 var util = require('util');
 
 var math = require('../math');
@@ -2215,7 +2274,7 @@ var wall = function(game, point, segments) {
 
 module.exports = wall;
 
-},{"../bodies/base":10,"../math":22,"util":8}],22:[function(require,module,exports){
+},{"../bodies/base":11,"../math":25,"util":8}],25:[function(require,module,exports){
 var lerp = function(v1, v2, t) {
 	return v1 + t * (v2 - v1);
 };
@@ -2280,7 +2339,7 @@ exports.lerp = function(p1, p2, t) {
 	return { x: lerp(p1.x, p2.x, t), y: lerp(p1.y, p2.y, t) };
 };
 
-},{}],23:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 var Mouse = function(element) {
 	this.position = null;
 	this.pressed = false;
@@ -2320,7 +2379,7 @@ MouseController.prototype.toJSON = function() {
 
 module.exports = MouseController;
 
-},{}],24:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 module.exports = function(arr, items) {
 	if(!Array.isArray(items)) items = [items];
 
@@ -2329,7 +2388,7 @@ module.exports = function(arr, items) {
 	});
 };
 
-},{}],25:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 module.exports = function(obj, fn) {
 	var result = {};
 
@@ -2341,7 +2400,7 @@ module.exports = function(obj, fn) {
 	return result;
 };
 
-},{}],26:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 var find = function(arr, fn) {
 	for(var i = 0; i < arr.length; i++) {
 		var item = arr[i];
@@ -2362,7 +2421,7 @@ module.exports = function(arr, obj) {
 	return find(arr, fn);
 };
 
-},{}],27:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 module.exports = function(obj, fn) {
 	var result = {};
 
@@ -2379,7 +2438,7 @@ module.exports = function(obj, fn) {
 	return result;
 };
 
-},{}],28:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 var remove = function(arr, item) {
 	var i = arr.indexOf(item);
 	if(i >= 0) arr.splice(i, 1);
@@ -2395,4 +2454,4 @@ module.exports = function(arr, item) {
 	}
 };
 
-},{}]},{},[17])
+},{}]},{},[20])

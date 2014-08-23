@@ -1,7 +1,7 @@
 var Rectangle = require('./bodies/rectangle');
-var Player = require('./bodies/player');
+var LocalPlayer = require('./bodies/local-player.client');
+var RemotePlayer = require('./bodies/remote-player.client');
 
-var math = require('./math');
 var KeyboardController = require('./keyboard-controller');
 var MouseController = require('./mouse-controller');
 
@@ -14,7 +14,6 @@ var level = require('./levels/level-1');
 
 var CLEAR_RADIUS = 40;
 var UPDATE_FREQUENCY = 16;
-var UPDATES_SIZE = 60 * 2; // 60fps * 2s
 var UPDATE_OFFSET = 100;
 
 var InputController = function(element) {
@@ -35,28 +34,6 @@ InputController.prototype.toJSON = function() {
 	});
 };
 
-var NoopController = function() {};
-
-NoopController.prototype.get = function(name) {
-	return null;
-};
-
-NoopController.prototype.toJSON = function() {
-	return {};
-};
-
-var SingleInputController = function(input) {
-	this.input = input;
-};
-
-SingleInputController.prototype.get = function(name) {
-	return this.input[name] || null;
-};
-
-SingleInputController.prototype.toJSON = function() {
-	return this.input;
-};
-
 var Game = function(element, options) {
 	this._options = options || {};
 	element = document.getElementById(element);
@@ -67,9 +44,6 @@ var Game = function(element, options) {
 
 	this.bodies = [];
 	this.others = [];
-
-	this.updates = [];
-	this.inputs = [];
 
 	this._animation = null;
 	this._update = null;
@@ -83,7 +57,7 @@ var Game = function(element, options) {
 
 	var input = new InputController(element);
 
-	this.player = new Player(this, input, {
+	this.player = new LocalPlayer(this, input, {
 		position: this.getAvailablePosition({ width: CLEAR_RADIUS, height: CLEAR_RADIUS }, 0)
 	});
 
@@ -104,7 +78,11 @@ Game.prototype.update = function(dt) {
 		body.update(dt);
 	});
 
-	this._interpolateUpdates();
+	var time = this._time.v - UPDATE_OFFSET;
+
+	this.others.forEach(function(other) {
+		other.interpolate(time);
+	});
 };
 
 Game.prototype.draw = function() {
@@ -182,7 +160,6 @@ Game.prototype._initialize = function(options) {
 	var self = this;
 	var socket = this._socket;
 	var lastTick = Date.now();
-	var sequence = 0;
 
 	this.player.id = options.id;
 	this._time = { u: Date.now(), v: options.t };
@@ -192,13 +169,17 @@ Game.prototype._initialize = function(options) {
 	});
 
 	socket.on('player_position', function(message) {
-		self.updates.push(message);
+		var update = find(message.players, { id: self.player.id });
+		if(update) self.player.reconcile(update);
 
-		if(self.updates.length >= UPDATES_SIZE) {
-			self.updates.shift();
-		}
+		self.others.forEach(function(other) {
+			var update = find(message.players, { id: other.id });
 
-		self._reconcileUpdate(message);
+			if(update) {
+				update.t = message.t;
+				other.addUpdate(update);
+			}
+		});
 	});
 	socket.on('player_join', function(message) {
 		self._addOther(message);
@@ -222,16 +203,9 @@ Game.prototype._initialize = function(options) {
 
 		self.update(dt);
 
-		var input = self.player.controller.toJSON();
+		var update = self.player.empty();
 
-		if(Object.keys(input).length) {
-			var update = {
-				input: input,
-				sequence: sequence++,
-				dt: dt
-			};
-
-			self.inputs.push(update);
+		if(update) {
 			socket.emit('update', update);
 		}
 	}, UPDATE_FREQUENCY);
@@ -245,60 +219,10 @@ Game.prototype._initialize = function(options) {
 Game.prototype._addOther = function(options) {
 	options.active = true;
 
-	var remote = new NoopController();
-	var player = new Player(this, remote, options);
+	var player = new RemotePlayer(this, options);
 
 	this.addBody(player);
 	this.others.push(player);
-};
-
-Game.prototype._reconcileUpdate = function(update) {
-	var self = this;
-	var local = find(update.players, { id: this.player.id });
-	var latestInput = find(this.inputs, { sequence: local.sequence });
-	var latestIndex = this.inputs.indexOf(latestInput);
-
-	if(latestIndex >= 0) {
-		this.inputs.splice(0, latestIndex + 1);
-
-		this.player.position = local.position;
-		this.player.direction = local.direction;
-
-		this.inputs.forEach(function(update) {
-			self.player.processInput(new SingleInputController(update.input), update.dt);
-		});
-	}
-};
-
-Game.prototype._interpolateUpdates = function() {
-	var self = this;
-	var offset = this._time.v - UPDATE_OFFSET;
-
-	var previousUpdate = find(this.updates, function(update, i, updates) {
-		return i < updates.length - 1 && update.t < offset && offset < updates[i + 1].t;
-	});
-
-	var nextUpdate = previousUpdate && this.updates[this.updates.indexOf(previousUpdate) + 1];
-
-	if(!previousUpdate || !nextUpdate) return;
-
-	var diff = nextUpdate.t - previousUpdate.t;
-	var progress = diff ? (offset - previousUpdate.t) / diff : 1;
-
-	nextUpdate.players.forEach(function(nextPlayer) {
-		var otherPlayer = find(self.others, { id: nextPlayer.id });
-		var previousPlayer = find(previousUpdate.players, { id: nextPlayer.id });
-
-		if(otherPlayer && previousPlayer) {
-			otherPlayer.position = math.lerp(previousPlayer.position, nextPlayer.position, progress);
-			otherPlayer.direction = (nextPlayer.direction - previousPlayer.direction) * progress + nextPlayer.direction;
-
-			if(nextPlayer.bullet) {
-				otherPlayer.shoot(nextPlayer.bullet);
-				nextPlayer.bullet = null;
-			}
-		}
-	});
 };
 
 module.exports = Game;

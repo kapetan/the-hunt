@@ -58,8 +58,6 @@ var Game = function(size) {
 util.inherits(Game, events.EventEmitter);
 
 Game.prototype.update = function(dt) {
-	var self = this;
-
 	append(this.bodies, this._add);
 	remove(this.bodies, this._remove);
 
