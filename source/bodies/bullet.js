@@ -78,7 +78,7 @@ var Bullet = function(game, player, options) {
 		position: player.position,
 		direction: player.direction,
 		visibility: 1
-	}, options || {});
+	}, options);
 
 	this.active = true;
 	this.collidable = true;
@@ -108,7 +108,7 @@ Bullet.prototype.update = function(dt) {
 Bullet.prototype.draw = function(options) {
 	var canvas = this.game.canvas;
 
-	options = extend(this, options || {});
+	options = extend(this, options);
 
 	canvas.save();
 	canvas.beginPath();

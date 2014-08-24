@@ -1,5 +1,6 @@
 var events = require('events');
 var util = require('util');
+var extend = require('xtend');
 
 var Rectangle = require('./bodies/rectangle');
 var Player = require('./bodies/player');
@@ -12,6 +13,7 @@ var level = require('./levels/level-1');
 
 var UPDATE_FREQUENCY = 16;
 var EMIT_POSITION_FREQUENCY = 45;
+var CLEAR_RADIUS = 50;
 
 var ClientController = function(socket) {
 	this.socket = socket;
@@ -84,6 +86,11 @@ Game.prototype.removeBody = function(body) {
 };
 
 Game.prototype.addPlayer = function(socket, options) {
+	options = extend({
+		id: socket.id,
+		position: this._getPosition()
+	}, options);
+
 	var self = this;
 	var controller = new ClientController(socket);
 	var player = new Player(this, controller, options);
@@ -99,6 +106,8 @@ Game.prototype.addPlayer = function(socket, options) {
 
 	this.players.push(player);
 	this.addBody(player);
+
+	return player;
 };
 
 Game.prototype.removePlayer = function(player) {
@@ -143,6 +152,20 @@ Game.prototype.getCollisions = function(rectangle, ignore) {
 
 Game.prototype.inBounds = function(rectangle) {
 	return this.bounds.isRectangleInside(rectangle);
+};
+
+Game.prototype._getPosition = function() {
+	var size = { width: CLEAR_RADIUS, height: CLEAR_RADIUS };
+	var rectangle;
+
+	do {
+		var x = Math.random() * this.size.width;
+		var y = Math.random() * this.size.height;
+
+		rectangle = new Rectangle({ x: x, y: y }, size, 0);
+	} while(this.getCollisions(rectangle).length || !this.inBounds(rectangle));
+
+	return rectangle.position;
 };
 
 Game.prototype._getPlayerState = function() {

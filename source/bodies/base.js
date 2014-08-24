@@ -36,7 +36,7 @@ Base.prototype.update = function(dt) {};
 Base.prototype.draw = function(options) {
 	var canvas = this.game.canvas;
 
-	options = extend(this, options || {});
+	options = extend(this, options);
 	if(options.visibility - Math.pow(10, -10) <= 0) return;
 	if(options.size.width <= 0 || options.size.height <= 0) return;
 

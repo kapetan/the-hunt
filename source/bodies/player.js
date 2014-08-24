@@ -34,7 +34,7 @@ var Player = function(game, controller, options) {
 		ammunition: 1,
 		active: false,
 		collidable: true
-	}, options || {});
+	}, options);
 
 	Base.call(this, game, options);
 

@@ -1225,7 +1225,7 @@ var Player = function(game, controller, options) {
 		ammunition: 1,
 		active: false,
 		collidable: true
-	}, options || {});
+	}, options);
 
 	Base.call(this, game, options);
 
@@ -1361,7 +1361,7 @@ Base.prototype.update = function(dt) {};
 Base.prototype.draw = function(options) {
 	var canvas = this.game.canvas;
 
-	options = extend(this, options || {});
+	options = extend(this, options);
 	if(options.visibility - Math.pow(10, -10) <= 0) return;
 	if(options.size.width <= 0 || options.size.height <= 0) return;
 
@@ -1461,7 +1461,7 @@ var Bullet = function(game, player, options) {
 		position: player.position,
 		direction: player.direction,
 		visibility: 1
-	}, options || {});
+	}, options);
 
 	this.active = true;
 	this.collidable = true;
@@ -1491,7 +1491,7 @@ Bullet.prototype.update = function(dt) {
 Bullet.prototype.draw = function(options) {
 	var canvas = this.game.canvas;
 
-	options = extend(this, options || {});
+	options = extend(this, options);
 
 	canvas.save();
 	canvas.beginPath();
@@ -1859,7 +1859,6 @@ var filter = require('./utils/filter');
 
 var level = require('./levels/level-1');
 
-var CLEAR_RADIUS = 40;
 var UPDATE_FREQUENCY = 16;
 var UPDATE_OFFSET = 100;
 
@@ -1885,10 +1884,12 @@ var Game = function(element, options) {
 	this._options = options || {};
 	element = document.getElementById(element);
 
+	this.element = element;
 	this.canvas = element.getContext('2d');
 	this.size = { width: element.width, height: element.height };
 	this.bounds = Rectangle.aligned({ x: 0, y: 0 }, this.size, 0);
 
+	this.player = null;
 	this.bodies = [];
 	this.others = [];
 
@@ -1901,15 +1902,6 @@ var Game = function(element, options) {
 	this._remove = [];
 
 	this.level = level(this);
-
-	var input = new InputController(element);
-
-	this.player = new LocalPlayer(this, input, {
-		position: this.getAvailablePosition({ width: CLEAR_RADIUS, height: CLEAR_RADIUS }, 0)
-	});
-
-	this.addBody(this.player);
-	this.level.fog.reveal(this.player);
 
 	level(this);
 };
@@ -1961,9 +1953,6 @@ Game.prototype.start = function() {
 	var self = this;
 	var socket = this._socket = io();
 
-	socket.on('connect', function() {
-		socket.emit('initialize', self.player.toJSON());
-	});
 	socket.on('initialize', function(message) {
 		self._initialize(message);
 	});
@@ -1977,19 +1966,6 @@ Game.prototype.stop = function() {
 	this._animation = null;
 	this._update = null;
 	this._socket = null;
-};
-
-Game.prototype.getAvailablePosition = function(size, direction) {
-	var rectangle;
-
-	do {
-		var x = Math.random() * this.size.width;
-		var y = Math.random() * this.size.height;
-
-		rectangle = new Rectangle({ x: x, y: y }, size, direction);
-	} while(this.getCollisions(rectangle).length || !this.inBounds(rectangle));
-
-	return rectangle.position;
 };
 
 Game.prototype.getCollisions = function(rectangle, ignore) {
@@ -2008,10 +1984,11 @@ Game.prototype._initialize = function(options) {
 	var socket = this._socket;
 	var lastTick = Date.now();
 
-	this.player.id = options.id;
 	this._time = { u: Date.now(), v: options.t };
 
-	options.players.forEach(function(other) {
+	this._createPlayer(options.self);
+
+	options.others.forEach(function(other) {
 		self._addOther(other);
 	});
 
@@ -2061,6 +2038,15 @@ Game.prototype._initialize = function(options) {
 		self.draw();
 		self._animation = requestAnimationFrame(tick);
 	});
+};
+
+Game.prototype._createPlayer = function(options) {
+	var input = new InputController(this.element);
+
+	this.player = new LocalPlayer(this, input, options);
+
+	this.addBody(this.player);
+	this.level.fog.reveal(this.player);
 };
 
 Game.prototype._addOther = function(options) {

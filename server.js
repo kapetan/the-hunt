@@ -20,25 +20,20 @@ app.get('{*}', function(request, response) {
 });
 
 io.on('connection', function(socket) {
-	socket.on('initialize', function(message) {
-		var players = game.players.map(function(player) {
-			return player.toJSON();
-		});
+	var others = game.players.slice();
+	var player = game.addPlayer(socket);
 
-		message.id = socket.id;
-		game.addPlayer(socket, message);
-
-		socket.emit('initialize', { id: socket.id, players: players, t: Date.now() });
-		socket.broadcast.emit('player_join', message);
+	socket.emit('initialize', {
+		self: player,
+		others: others,
+		t: Date.now()
 	});
 
-	socket.on('disconnect', function() {
-		var player = find(game.players, { id: socket.id });
+	socket.broadcast.emit('player_join', player);
 
-		if(player) {
-			game.removePlayer(player);
-			socket.broadcast.emit('player_leave', { id: socket.id, t: Date.now() });
-		}
+	socket.on('disconnect', function() {
+		game.removePlayer(player);
+		socket.broadcast.emit('player_leave', { id: player.id });
 	});
 });
 
