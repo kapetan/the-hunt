@@ -1777,6 +1777,11 @@ RemotePlayer.prototype.interpolate = function(time) {
 
 	this.position = math.lerp(previous.position, next.position, progress);
 	this.direction = (next.direction - previous.direction) * progress + next.direction;
+
+	if(previous.bullet) {
+		this.shoot(previous.bullet);
+		previous.bullet = null;
+	}
 };
 
 RemotePlayer.prototype._getUpdates = function(time) {
