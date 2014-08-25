@@ -23,7 +23,7 @@ var toJSON = function(obj, properties) {
 	return JSON.parse(JSON.stringify(json));
 };
 
-var Player = function(game, controller, options) {
+var Player = function(game, options) {
 	options = extend({
 		size: SIZE,
 		direction: 0,
@@ -37,8 +37,6 @@ var Player = function(game, controller, options) {
 	}, options);
 
 	Base.call(this, game, options);
-
-	this.controller = controller;
 
 	this.active = options.active;
 	this.collidable = options.collidable;
@@ -57,12 +55,10 @@ util.inherits(Player, Base);
 Player.prototype.update = function(dt) {
 	this.footTrack.update(dt);
 	if(this.ammunition < 1) this.ammunition += this.reloadSpeed * dt;
-
-	this.processInput(this.controller, dt);
 };
 
-Player.prototype.processInput = function(controller, dt) {
-	var target = controller.get('target');
+Player.prototype.processInput = function(input, dt) {
+	var target = input.target;
 	var position = this.position;
 
 	var next = { x: position.x, y: position.y, direction: this.direction };
@@ -74,24 +70,24 @@ Player.prototype.processInput = function(controller, dt) {
 		next.x = position.x + d.x * this.speed * dt;
 		next.y = position.y + d.y * this.speed * dt;
 	} else {
-		if(controller.get('shoot') && this.ammunition >= 1) {
+		if(input.shoot && this.ammunition >= 1) {
 			var bullet = this.shoot();
 
 			this.ammunition = 0;
 			this.emit('bullet', bullet);
 		}
-		if(controller.get('left')) {
+		if(input.left) {
 			next.direction = this.direction - ROTATION_SPEED * dt;
 		}
-		if(controller.get('right')) {
+		if(input.right) {
 			next.direction = this.direction + ROTATION_SPEED * dt;
 		}
-		if(controller.get('up')) {
+		if(input.up) {
 			var t = math.translate(position, this.direction, this.speed * dt);
 			next.x = t.x;
 			next.y = t.y;
 		}
-		if(controller.get('down')) {
+		if(input.down) {
 			var t = math.translate(position, this.direction + Math.PI, this.speed * dt);
 			next.x = t.x;
 			next.y = t.y;

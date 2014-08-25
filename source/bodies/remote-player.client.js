@@ -5,23 +5,17 @@ var math = require('../math');
 
 var UPDATES_SIZE = 60 * 2;
 
-var NoopController = function() {};
-
-NoopController.prototype.get = function(name) {
-	return null;
-};
-
-NoopController.prototype.toJSON = function() {
-	return {};
-};
+var noop = function() {};
 
 var RemotePlayer = function(game, options) {
-	Player.call(this, game, new NoopController(), options);
+	Player.call(this, game, options);
 
 	this.updates = [];
 };
 
 util.inherits(RemotePlayer, Player);
+
+RemotePlayer.prototype.processInput = noop;
 
 RemotePlayer.prototype.addUpdate = function(update) {
 	this.updates.push(update);

@@ -1,9 +1,10 @@
+var extend = require('xtend');
+
 var Rectangle = require('./bodies/rectangle');
 var LocalPlayer = require('./bodies/local-player.client');
 var RemotePlayer = require('./bodies/remote-player.client');
-
-var KeyboardController = require('./keyboard-controller');
-var MouseController = require('./mouse-controller');
+var Keyboard = require('./keyboard');
+var Mouse = require('./mouse');
 
 var append = require('./utils/append');
 var remove = require('./utils/remove');
@@ -16,22 +17,13 @@ var UPDATE_FREQUENCY = 16;
 var UPDATE_OFFSET = 100;
 
 var InputController = function(element) {
-	this.keyboard = new KeyboardController();
-	this.mouse = new MouseController(element);
+	this.keyboard = new Keyboard();
+	this.mouse = new Mouse(element);
 };
 
-InputController.prototype.get = function(name) {
-	return this.keyboard.get(name) || this.mouse.get(name);
-};
-
-InputController.prototype.toJSON = function() {
-	var json = this.keyboard.toJSON();
-	json.target = this.mouse.get('target');
-
-	return filter(json, function(key, value) {
-		return value;
-	});
-};
+InputController.prototype.__defineGetter__('input', function() {
+	return extend(this.keyboard.input, this.mouse.input);
+});
 
 var Game = function(element, options) {
 	this._options = options || {};
@@ -194,9 +186,8 @@ Game.prototype._initialize = function(options) {
 };
 
 Game.prototype._createPlayer = function(options) {
-	var input = new InputController(this.element);
-
-	this.player = new LocalPlayer(this, input, options);
+	var controller = new InputController(this.element);
+	this.player = new LocalPlayer(this, controller, options);
 
 	this.addBody(this.player);
 	this.level.fog.reveal(this.player);

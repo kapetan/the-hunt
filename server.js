@@ -5,7 +5,6 @@ var send = require('send');
 var socketio = require('socket.io');
 
 var Game = require('./source/game.server');
-var find = require('./source/utils/find');
 
 var PORT = process.env.PORT || 10103;
 

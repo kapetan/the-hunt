@@ -1,26 +1,15 @@
 var util = require('util');
-
 var Player = require('./player');
 var find = require('../utils/find');
 
-var SingleInputController = function(input) {
-	this.input = input;
-};
-
-SingleInputController.prototype.get = function(name) {
-	return this.input[name] || null;
-};
-
-SingleInputController.prototype.toJSON = function() {
-	return this.input;
-};
-
-var LocalPlayer = function() {
-	Player.apply(this, arguments);
+var LocalPlayer = function(game, controller, options) {
+	Player.call(this, game, options);
 
 	this.inputs = [];
 	this.pending = null;
 	this.sequence = 0;
+
+	this.controller = controller;
 };
 
 util.inherits(LocalPlayer, Player);
@@ -28,9 +17,11 @@ util.inherits(LocalPlayer, Player);
 LocalPlayer.prototype.update = function(dt) {
 	Player.prototype.update.call(this, dt);
 
-	var input = this.controller.toJSON();
+	var input = this.controller.input;
 
 	if(Object.keys(input).length) {
+		this.processInput(input, dt);
+
 		var sequence = this.sequence++;
 		var update = {
 			input: input,
@@ -61,7 +52,7 @@ LocalPlayer.prototype.reconcile = function(update) {
 	this.direction = update.direction;
 
 	this.inputs.forEach(function(i) {
-		self.processInput(new SingleInputController(i.input), i.dt);
+		self.processInput(i.input, i.dt);
 	});
 };
 
