@@ -10,3 +10,7 @@ To start the game clone this repository and run the following in a terminal.
 	node ./server.js
 
 The game is built around an authorative server. Big parts of the code are both run on the client and the server, accomplished using `browserify` on the client and `Node.js` on the server. The clients use interpolation to smooth the movement of other players, and local client prediction to make the game responsive, while keeping the local player state synchronized with the server.
+
+Try the offline, single-player [demo][demo]. It doesn't need the server, runs locally in the browser.
+
+[demo]: http://kapetan.github.io/the-hunt/dist/offline.html "Offline demo"
