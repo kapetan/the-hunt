@@ -15,6 +15,7 @@ var level = require('./levels/level-1');
 
 var UPDATE_FREQUENCY = 16;
 var UPDATE_OFFSET = 100;
+var INITIAL_POSITION = { x: 30, y: 30 };
 
 var InputController = function(element) {
 	this.keyboard = new Keyboard();
@@ -40,6 +41,7 @@ var Game = function(element, options) {
 
 	this._animation = null;
 	this._update = null;
+	this._emit = null;
 	this._socket = null;
 	this._time = { u: 0, v: 0 };
 
@@ -96,20 +98,31 @@ Game.prototype.removeBody = function(body) {
 
 Game.prototype.start = function() {
 	var self = this;
-	var socket = this._socket = io();
 
-	socket.on('initialize', function(message) {
-		self._initialize(message);
-	});
+	if(this._options.offline) {
+		this._initializeLocal({
+			self: { position: INITIAL_POSITION },
+			others: [],
+			t: Date.now()
+		});
+	} else {
+		this._socket = io();
+		this._socket.on('initialize', function(message) {
+			self._initializeLocal(message);
+			self._initializeRemote();
+		});
+	}
 };
 
 Game.prototype.stop = function() {
 	cancelAnimationFrame(this._animation);
 	clearInterval(this._update);
+	clearInterval(this._emit);
 	this._socket.close();
 
 	this._animation = null;
 	this._update = null;
+	this._emit = null;
 	this._socket = null;
 };
 
@@ -124,9 +137,8 @@ Game.prototype.inBounds = function(rectangle) {
 	return this.bounds.isRectangleInside(rectangle);
 };
 
-Game.prototype._initialize = function(options) {
+Game.prototype._initializeLocal = function(options) {
 	var self = this;
-	var socket = this._socket;
 	var lastTick = Date.now();
 
 	this._time = { u: Date.now(), v: options.t };
@@ -136,6 +148,27 @@ Game.prototype._initialize = function(options) {
 	options.others.forEach(function(other) {
 		self._addOther(other);
 	});
+
+	this._update = setInterval(function() {
+		var now = Date.now();
+		var dt = now - lastTick;
+		lastTick = now;
+
+		self._time.v += (now - self._time.u);
+		self._time.u = now;
+
+		self.update(dt);
+	}, UPDATE_FREQUENCY);
+
+	this._animation = requestAnimationFrame(function tick() {
+		self.draw();
+		self._animation = requestAnimationFrame(tick);
+	});
+};
+
+Game.prototype._initializeRemote = function() {
+	var self = this;
+	var socket = this._socket;
 
 	socket.on('player_position', function(message) {
 		var update = find(message.players, { id: self.player.id });
@@ -162,27 +195,11 @@ Game.prototype._initialize = function(options) {
 		}
 	});
 
-	this._update = setInterval(function() {
-		var now = Date.now();
-		var dt = now - lastTick;
-		lastTick = now;
-
-		self._time.v += (now - self._time.u);
-		self._time.u = now;
-
-		self.update(dt);
-
-		var update = self.player.empty();
-
-		if(update) {
+	this._emit = setInterval(function() {
+		self.player.drain().forEach(function(update) {
 			socket.emit('update', update);
-		}
+		});
 	}, UPDATE_FREQUENCY);
-
-	this._animation = requestAnimationFrame(function tick() {
-		self.draw();
-		self._animation = requestAnimationFrame(tick);
-	});
 };
 
 Game.prototype._createPlayer = function(options) {

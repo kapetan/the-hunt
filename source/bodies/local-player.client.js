@@ -6,7 +6,7 @@ var LocalPlayer = function(game, controller, options) {
 	Player.call(this, game, options);
 
 	this.inputs = [];
-	this.pending = null;
+	this.pending = [];
 	this.sequence = 0;
 
 	this.controller = controller;
@@ -30,13 +30,13 @@ LocalPlayer.prototype.update = function(dt) {
 		};
 
 		this.inputs.push(update);
-		this.pending = update;
+		this.pending.push(update);
 	}
 };
 
-LocalPlayer.prototype.empty = function() {
+LocalPlayer.prototype.drain = function() {
 	var pending = this.pending;
-	this.pending = null;
+	this.pending = [];
 
 	return pending;
 };
