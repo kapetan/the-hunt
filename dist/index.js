@@ -2003,7 +2003,7 @@ Game.prototype._initializeRemote = function() {
 	var self = this;
 	var socket = this._socket;
 
-	socket.on('player_position', function(message) {
+	socket.on('player_state', function(message) {
 		var update = find(message.players, { id: self.player.id });
 		if(update) self.player.reconcile(update);
 

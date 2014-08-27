@@ -36,8 +36,8 @@ io.on('connection', function(socket) {
 	});
 });
 
-game.on('player_position', function(data) {
-	io.emit('player_position', data);
+game.on('player_state', function(data) {
+	io.emit('player_state', data);
 });
 
 game.start();

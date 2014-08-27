@@ -71,7 +71,7 @@ Game.prototype.addPlayer = function(socket, options) {
 
 		state.bullet = bullet.toJSON();
 
-		self.emit('player_position', { players: players, t: Date.now() });
+		self.emit('player_state', { players: players, t: Date.now() });
 	});
 
 	this.players.push(player);
@@ -100,7 +100,7 @@ Game.prototype.start = function() {
 	this._state = setTimeout(function emit() {
 		var players = self._getPlayerState();
 
-		self.emit('player_position', { players: players, t: Date.now() });
+		self.emit('player_state', { players: players, t: Date.now() });
 		self._state = setTimeout(emit, EMIT_POSITION_FREQUENCY);
 	}, EMIT_POSITION_FREQUENCY);
 };
