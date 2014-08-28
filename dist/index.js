@@ -1938,6 +1938,7 @@ Game.prototype.start = function() {
 			others: [],
 			t: Date.now()
 		});
+		this._drainUpdates();
 	} else {
 		this._socket = io();
 		this._socket.on('initialize', function(message) {
@@ -2050,6 +2051,14 @@ Game.prototype._addOther = function(options) {
 
 	this.addBody(player);
 	this.others.push(player);
+};
+
+Game.prototype._drainUpdates = function() {
+	var self = this;
+
+	setInterval(function() {
+		self.player.drain();
+	}, UPDATE_FREQUENCY);
 };
 
 module.exports = Game;
