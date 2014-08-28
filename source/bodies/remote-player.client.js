@@ -1,6 +1,6 @@
 var util = require('util');
 
-var Player = require('./Player');
+var Player = require('./player');
 var math = require('../math');
 
 var UPDATES_SIZE = 60 * 2;

@@ -1,5 +1,5 @@
 var util = require('util');
-var Player = require('./Player');
+var Player = require('./player');
 var append = require('../utils/append');
 
 var ServerPlayer = function(game, socket, options) {

@@ -1011,136 +1011,6 @@ function extend() {
 
 },{}],7:[function(require,module,exports){
 var util = require('util');
-var extend = require('xtend');
-
-var math = require('../math');
-var Rectangle = require('./rectangle');
-var Base = require('./base');
-var FootTrack = require('./foot-track');
-var Bullet = require('./bullet');
-
-var SIZE = { width: 20, height: 20 };
-var ROTATION_SPEED = Math.PI / 800;
-var MOVING_SPEED = 0.1;
-var LINE_OF_SIGHT = 90;
-var LINE_OF_SIGHT_EDGE = 10;
-var RELOAD_SPEED = 0.001;
-
-var toJSON = function(obj, properties) {
-	var json = properties.reduce(function(acc, name) {
-		acc[name] = obj[name];
-		return acc;
-	}, {});
-
-	return JSON.parse(JSON.stringify(json));
-};
-
-var Player = function(game, options) {
-	options = extend({
-		size: SIZE,
-		direction: 0,
-		visibility: 1,
-		speed: MOVING_SPEED,
-		lineOfSight: LINE_OF_SIGHT,
-		reloadSpeed: RELOAD_SPEED,
-		ammunition: 1,
-		active: false,
-		collidable: true
-	}, options);
-
-	Base.call(this, game, options);
-
-	this.active = options.active;
-	this.collidable = options.collidable;
-
-	this.id = options.id;
-	this.speed = options.speed;
-	this.lineOfSight = options.lineOfSight;
-	this.reloadSpeed = options.reloadSpeed;
-	this.ammunition = options.ammunition;
-
-	this.footTrack = options.footTrack || new FootTrack(game, this);
-};
-
-util.inherits(Player, Base);
-
-Player.prototype.update = function(dt) {
-	this.footTrack.update(dt);
-	if(this.ammunition < 1) this.ammunition += this.reloadSpeed * dt;
-};
-
-Player.prototype.processInput = function(input, dt) {
-	var target = input.target;
-	var position = this.position;
-
-	var next = { x: position.x, y: position.y, direction: this.direction };
-
-	if(target) {
-		var d = math.direction({ x: target.x - position.x, y: target.y - position.y });
-
-		next.direction = d.radians;
-		next.x = position.x + d.x * this.speed * dt;
-		next.y = position.y + d.y * this.speed * dt;
-	} else {
-		if(input.shoot && this.ammunition >= 1) {
-			var bullet = this.shoot();
-
-			this.ammunition = 0;
-			this.emit('bullet', bullet);
-		}
-		if(input.left) {
-			next.direction = this.direction - ROTATION_SPEED * dt;
-		}
-		if(input.right) {
-			next.direction = this.direction + ROTATION_SPEED * dt;
-		}
-		if(input.up) {
-			var t = math.translate(position, this.direction, this.speed * dt);
-			next.x = t.x;
-			next.y = t.y;
-		}
-		if(input.down) {
-			var t = math.translate(position, this.direction + Math.PI, this.speed * dt);
-			next.x = t.x;
-			next.y = t.y;
-		}
-	}
-
-	var bounds = new Rectangle(next, this.size, next.direction);
-
-	if(!this.game.inBounds(bounds)) return;
-	if(this.game.getCollisions(bounds, [this]).length) return;
-
-	this.position.x = next.x;
-	this.position.y = next.y;
-	this.direction = next.direction;
-};
-
-Player.prototype.shoot = function(options) {
-	var bullet = new Bullet(this.game, this, options);
-	this.game.addBody(bullet);
-
-	return bullet;
-};
-
-Player.prototype.visibilityOf = function(pointOrBody) {
-	var d = this.distanceTo(pointOrBody);
-	var inner = this.lineOfSight - LINE_OF_SIGHT_EDGE;
-	var outer = this.lineOfSight + LINE_OF_SIGHT_EDGE;
-
-	if(d > outer) return 0;
-	if(d < inner) return 1;
-	return (1 - (d - inner) / (outer - inner));
-};
-
-Player.prototype.toJSON = function() {
-	return toJSON(this, ['id', 'position', 'size', 'direction', 'visibility', 'speed', 'lineOfSight', 'reloadSpeed', 'ammunition']);
-};
-
-module.exports = Player;
-
-},{"../math":21,"./base":8,"./bullet":9,"./foot-track":10,"./rectangle":13,"util":5,"xtend":6}],8:[function(require,module,exports){
-var util = require('util');
 var events = require('events');
 var extend = require('xtend');
 
@@ -1197,7 +1067,7 @@ Base.prototype.distanceTo = function(bodyOrPoint) {
 
 module.exports = Base;
 
-},{"../math":21,"./rectangle":13,"events":1,"util":5,"xtend":6}],9:[function(require,module,exports){
+},{"../math":20,"./rectangle":12,"events":1,"util":5,"xtend":6}],8:[function(require,module,exports){
 var util = require('util');
 var extend = require('xtend');
 
@@ -1328,7 +1198,7 @@ Bullet.prototype.toJSON = function() {
 
 module.exports = Bullet;
 
-},{"../math":21,"./base":8,"./rectangle":13,"util":5,"xtend":6}],10:[function(require,module,exports){
+},{"../math":20,"./base":7,"./rectangle":12,"util":5,"xtend":6}],9:[function(require,module,exports){
 var util = require('util');
 
 var math = require('../math');
@@ -1401,7 +1271,7 @@ FootTrack.prototype.update = function(dt) {
 
 module.exports = FootTrack;
 
-},{"../math":21,"./base":8,"util":5}],11:[function(require,module,exports){
+},{"../math":20,"./base":7,"util":5}],10:[function(require,module,exports){
 var util = require('util');
 var Player = require('./player');
 var find = require('../utils/find');
@@ -1462,9 +1332,137 @@ LocalPlayer.prototype.reconcile = function(update) {
 
 module.exports = LocalPlayer;
 
-},{"../utils/find":26,"./player":12,"util":5}],12:[function(require,module,exports){
-module.exports=require(7)
-},{"../math":21,"./base":8,"./bullet":9,"./foot-track":10,"./rectangle":13,"util":5,"xtend":6}],13:[function(require,module,exports){
+},{"../utils/find":25,"./player":11,"util":5}],11:[function(require,module,exports){
+var util = require('util');
+var extend = require('xtend');
+
+var math = require('../math');
+var Rectangle = require('./rectangle');
+var Base = require('./base');
+var FootTrack = require('./foot-track');
+var Bullet = require('./bullet');
+
+var SIZE = { width: 20, height: 20 };
+var ROTATION_SPEED = Math.PI / 800;
+var MOVING_SPEED = 0.1;
+var LINE_OF_SIGHT = 90;
+var LINE_OF_SIGHT_EDGE = 10;
+var RELOAD_SPEED = 0.001;
+
+var toJSON = function(obj, properties) {
+	var json = properties.reduce(function(acc, name) {
+		acc[name] = obj[name];
+		return acc;
+	}, {});
+
+	return JSON.parse(JSON.stringify(json));
+};
+
+var Player = function(game, options) {
+	options = extend({
+		size: SIZE,
+		direction: 0,
+		visibility: 1,
+		speed: MOVING_SPEED,
+		lineOfSight: LINE_OF_SIGHT,
+		reloadSpeed: RELOAD_SPEED,
+		ammunition: 1,
+		active: false,
+		collidable: true
+	}, options);
+
+	Base.call(this, game, options);
+
+	this.active = options.active;
+	this.collidable = options.collidable;
+
+	this.id = options.id;
+	this.speed = options.speed;
+	this.lineOfSight = options.lineOfSight;
+	this.reloadSpeed = options.reloadSpeed;
+	this.ammunition = options.ammunition;
+
+	this.footTrack = options.footTrack || new FootTrack(game, this);
+};
+
+util.inherits(Player, Base);
+
+Player.prototype.update = function(dt) {
+	this.footTrack.update(dt);
+	if(this.ammunition < 1) this.ammunition += this.reloadSpeed * dt;
+};
+
+Player.prototype.processInput = function(input, dt) {
+	var target = input.target;
+	var position = this.position;
+
+	var next = { x: position.x, y: position.y, direction: this.direction };
+
+	if(target) {
+		var d = math.direction({ x: target.x - position.x, y: target.y - position.y });
+
+		next.direction = d.radians;
+		next.x = position.x + d.x * this.speed * dt;
+		next.y = position.y + d.y * this.speed * dt;
+	} else {
+		if(input.shoot && this.ammunition >= 1) {
+			var bullet = this.shoot();
+
+			this.ammunition = 0;
+			this.emit('bullet', bullet);
+		}
+		if(input.left) {
+			next.direction = this.direction - ROTATION_SPEED * dt;
+		}
+		if(input.right) {
+			next.direction = this.direction + ROTATION_SPEED * dt;
+		}
+		if(input.up) {
+			var t = math.translate(position, this.direction, this.speed * dt);
+			next.x = t.x;
+			next.y = t.y;
+		}
+		if(input.down) {
+			var t = math.translate(position, this.direction + Math.PI, this.speed * dt);
+			next.x = t.x;
+			next.y = t.y;
+		}
+	}
+
+	var bounds = new Rectangle(next, this.size, next.direction);
+
+	if(!this.game.inBounds(bounds)) return;
+	if(this.game.getCollisions(bounds, [this]).length) return;
+
+	this.position.x = next.x;
+	this.position.y = next.y;
+	this.direction = next.direction;
+};
+
+Player.prototype.shoot = function(options) {
+	var bullet = new Bullet(this.game, this, options);
+	this.game.addBody(bullet);
+
+	return bullet;
+};
+
+Player.prototype.visibilityOf = function(pointOrBody) {
+	var d = this.distanceTo(pointOrBody);
+	var inner = this.lineOfSight - LINE_OF_SIGHT_EDGE;
+	var outer = this.lineOfSight + LINE_OF_SIGHT_EDGE;
+
+	if(d > outer) return 0;
+	if(d < inner) return 1;
+	return (1 - (d - inner) / (outer - inner));
+};
+
+Player.prototype.toJSON = function() {
+	return toJSON(this, ['id', 'position', 'size', 'direction', 'visibility', 'speed', 'lineOfSight', 'reloadSpeed', 'ammunition']);
+};
+
+module.exports = Player;
+
+},{"../math":20,"./base":7,"./bullet":8,"./foot-track":9,"./rectangle":12,"util":5,"xtend":6}],12:[function(require,module,exports){
 var math = require('../math');
 var colliding = require('../colliding');
 
@@ -1539,10 +1537,10 @@ Rectangle.prototype.isPointInside = function(point) {
 
 module.exports = Rectangle;
 
-},{"../colliding":15,"../math":21}],14:[function(require,module,exports){
+},{"../colliding":14,"../math":20}],13:[function(require,module,exports){
 var util = require('util');
 
-var Player = require('./Player');
+var Player = require('./player');
 var math = require('../math');
 
 var UPDATES_SIZE = 60 * 2;
@@ -1601,7 +1599,7 @@ RemotePlayer.prototype._getUpdates = function(time) {
 
 module.exports = RemotePlayer;
 
-},{"../math":21,"./Player":7,"util":5}],15:[function(require,module,exports){
+},{"../math":20,"./player":11,"util":5}],14:[function(require,module,exports){
 var subtract = function(p1, p2) {
 	return { x: p1.x - p2.x, y: p1.y - p2.y };
 };
@@ -1651,7 +1649,7 @@ module.exports = function(p1, p2) {
 		isOverlaping(subtract(p2[1], p2[2]), p1, p2);
 };
 
-},{}],16:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 var extend = require('xtend');
 
 var Rectangle = require('./bodies/rectangle');
@@ -1885,7 +1883,7 @@ Game.prototype._drainUpdates = function() {
 
 module.exports = Game;
 
-},{"./bodies/local-player.client":11,"./bodies/rectangle":13,"./bodies/remote-player.client":14,"./keyboard":17,"./levels/level-1":19,"./mouse":22,"./utils/append":24,"./utils/filter":25,"./utils/find":26,"./utils/remove":27,"xtend":6}],17:[function(require,module,exports){
+},{"./bodies/local-player.client":10,"./bodies/rectangle":12,"./bodies/remote-player.client":13,"./keyboard":16,"./levels/level-1":18,"./mouse":21,"./utils/append":23,"./utils/filter":24,"./utils/find":25,"./utils/remove":26,"xtend":6}],16:[function(require,module,exports){
 var KEYS = {
 	37: 'left',
 	38: 'up',
@@ -1923,7 +1921,7 @@ var Keyboard = function() {
 
 module.exports = Keyboard;
 
-},{}],18:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 var util = require('util');
 
 var DENSITY = 0.1;
@@ -1983,7 +1981,7 @@ Fog.prototype.reveal = function(body) {
 
 module.exports = Fog;
 
-},{"util":5}],19:[function(require,module,exports){
+},{"util":5}],18:[function(require,module,exports){
 var wall = require('./wall');
 var Fog = require('./fog');
 
@@ -1999,7 +1997,7 @@ module.exports = function(game) {
 	};
 };
 
-},{"./fog":18,"./wall":20}],20:[function(require,module,exports){
+},{"./fog":17,"./wall":19}],19:[function(require,module,exports){
 var util = require('util');
 
 var math = require('../math');
@@ -2057,7 +2055,7 @@ var wall = function(game, point, segments) {
 
 module.exports = wall;
 
-},{"../bodies/base":8,"../math":21,"util":5}],21:[function(require,module,exports){
+},{"../bodies/base":7,"../math":20,"util":5}],20:[function(require,module,exports){
 var lerp = function(v1, v2, t) {
 	return v1 + t * (v2 - v1);
 };
@@ -2122,7 +2120,7 @@ exports.lerp = function(p1, p2, t) {
 	return { x: lerp(p1.x, p2.x, t), y: lerp(p1.y, p2.y, t) };
 };
 
-},{}],22:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 var Mouse = function(element) {
 	var local = {};
 	var input = this.input = {};
@@ -2144,13 +2142,13 @@ var Mouse = function(element) {
 
 module.exports = Mouse;
 
-},{}],23:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 var Game = require('./game.client');
 
 var game = new Game('canvas', { offline: true });
 game.start();
 
-},{"./game.client":16}],24:[function(require,module,exports){
+},{"./game.client":15}],23:[function(require,module,exports){
 module.exports = function(arr, items) {
 	if(!Array.isArray(items)) items = [items];
 
@@ -2159,7 +2157,7 @@ module.exports = function(arr, items) {
 	});
 };
 
-},{}],25:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 module.exports = function(obj, fn) {
 	var result = {};
 
@@ -2171,7 +2169,7 @@ module.exports = function(obj, fn) {
 	return result;
 };
 
-},{}],26:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 var find = function(arr, fn) {
 	for(var i = 0; i < arr.length; i++) {
 		var item = arr[i];
@@ -2192,7 +2190,7 @@ module.exports = function(arr, obj) {
 	return find(arr, fn);
 };
 
-},{}],27:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 var remove = function(arr, item) {
 	var i = arr.indexOf(item);
 	if(i >= 0) arr.splice(i, 1);
@@ -2208,4 +2206,4 @@ module.exports = function(arr, item) {
 	}
 };
 
-},{}]},{},[23])
+},{}]},{},[22])
