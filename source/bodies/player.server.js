@@ -1,5 +1,6 @@
 var util = require('util');
 var Player = require('./Player');
+var append = require('../utils/append');
 
 var ServerPlayer = function(game, socket, options) {
 	Player.call(this, game, options);
@@ -9,8 +10,8 @@ var ServerPlayer = function(game, socket, options) {
 	this.updates = [];
 	this.sequence = -1;
 
-	socket.on('update', function(update) {
-		self.updates.push(update);
+	socket.on('update', function(updates) {
+		append(self.updates, updates);
 	});
 };
 

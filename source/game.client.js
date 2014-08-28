@@ -15,6 +15,7 @@ var level = require('./levels/level-1');
 
 var UPDATE_FREQUENCY = 16;
 var UPDATE_OFFSET = 100;
+var EMIT_UPDATES_FREQUENCY = 45;
 var INITIAL_POSITION = { x: 30, y: 30 };
 
 var InputController = function(element) {
@@ -107,7 +108,9 @@ Game.prototype.start = function() {
 		});
 		this._drainUpdates();
 	} else {
-		this._socket = io();
+		this._socket = io({
+			reconnection: false
+		});
 		this._socket.on('initialize', function(message) {
 			self._initializeLocal(message);
 			self._initializeRemote();
@@ -197,10 +200,8 @@ Game.prototype._initializeRemote = function() {
 	});
 
 	this._emit = setInterval(function() {
-		self.player.drain().forEach(function(update) {
-			socket.emit('update', update);
-		});
-	}, UPDATE_FREQUENCY);
+		socket.emit('update', self.player.drain());
+	}, EMIT_UPDATES_FREQUENCY);
 };
 
 Game.prototype._createPlayer = function(options) {
