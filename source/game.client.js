@@ -200,7 +200,8 @@ Game.prototype._initializeRemote = function() {
 	});
 
 	this._emit = setInterval(function() {
-		socket.emit('update', self.player.drain());
+		var updates = self.player.drain();
+		if(updates.length) socket.emit('update', updates);
 	}, EMIT_UPDATES_FREQUENCY);
 };
 
