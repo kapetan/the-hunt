@@ -1590,8 +1590,8 @@ RemotePlayer.prototype._getUpdates = function(time) {
 	for(var i = 0; i < updates.length - 1; i++) {
 		if(updates[i].t < time && time < updates[i + 1].t) {
 			return {
-				next: updates[i],
-				previous: updates[i + 1]
+				next: updates[i + 1],
+				previous: updates[i]
 			};
 		}
 	}
