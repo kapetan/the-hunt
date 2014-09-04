@@ -1670,6 +1670,9 @@ var UPDATE_OFFSET = 100;
 var EMIT_UPDATES_FREQUENCY = 45;
 var INITIAL_POSITION = { x: 30, y: 30 };
 
+var TIME_SYNC_RETRIES = 2;
+var TIME_SYNC_FREQUENCY = 100;
+
 var InputController = function(element) {
 	this.keyboard = new Keyboard();
 	this.mouse = new Mouse(element);
@@ -1764,8 +1767,12 @@ Game.prototype.start = function() {
 			reconnection: false
 		});
 		this._socket.on('initialize', function(message) {
-			self._initializeLocal(message);
-			self._initializeRemote();
+			self._synchronizeTime(function(t) {
+				message.t = t;
+
+				self._initializeLocal(message);
+				self._initializeRemote();
+			});
 		});
 	}
 };
@@ -1880,6 +1887,33 @@ Game.prototype._drainUpdates = function() {
 	setInterval(function() {
 		self.player.drain();
 	}, UPDATE_FREQUENCY);
+};
+
+Game.prototype._synchronizeTime = function(callback) {
+	var socket = this._socket;
+	var times = TIME_SYNC_RETRIES;
+	var l = Number.MAX_VALUE;
+	var t = 0;
+
+	var sync = function() {
+		var now = Date.now();
+
+		socket.once('pong', function(message) {
+			var latency = (Date.now() - now) / 2;
+
+			if(latency < l) {
+				t = message.t;
+				l = latency;
+			}
+
+			if(times--) setTimeout(sync, TIME_SYNC_FREQUENCY);
+			else callback(Math.round(t - l));
+		});
+
+		socket.emit('ping');
+	};
+
+	sync();
 };
 
 module.exports = Game;

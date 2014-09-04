@@ -28,6 +28,10 @@ io.on('connection', function(socket) {
 		t: Date.now()
 	});
 
+	socket.on('ping', function() {
+		socket.emit('pong', { t: Date.now() });
+	});
+
 	socket.broadcast.emit('player_join', player);
 
 	socket.on('disconnect', function() {
