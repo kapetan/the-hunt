@@ -1341,7 +1341,7 @@ Bullet.prototype.update = function(dt) {
 	var game = this.game;
 	var bounds = this.getRectangle();
 
-	if(!game.inBounds(bounds) || game.getCollisions(bounds, [this, this.player]).length) {
+	if(!game.inBounds(bounds) || game.isColliding(bounds, [this, this.player])) {
 		explosion(game, this.position);
 		explosion(game, this.position, [255, 163, 18]);
 
@@ -1611,7 +1611,7 @@ Player.prototype.processInput = function(input, dt) {
 	var bounds = new Rectangle(next, this.size, next.direction);
 
 	if(!this.game.inBounds(bounds)) return;
-	if(this.game.getCollisions(bounds, [this]).length) return;
+	if(this.game.isColliding(bounds, [this])) return;
 
 	this.position.x = next.x;
 	this.position.y = next.y;
@@ -1968,8 +1968,8 @@ Game.prototype.stop = function() {
 	this._socket = null;
 };
 
-Game.prototype.getCollisions = function(rectangle, ignore) {
-	return this.bodies.filter(function(body) {
+Game.prototype.isColliding = function(rectangle, ignore) {
+	return this.bodies.some(function(body) {
 		if(ignore && ignore.indexOf(body) >= 0) return false;
 		return body.collidable && rectangle.isColliding(body.getRectangle());
 	});

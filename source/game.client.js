@@ -137,8 +137,8 @@ Game.prototype.stop = function() {
 	this._socket = null;
 };
 
-Game.prototype.getCollisions = function(rectangle, ignore) {
-	return this.bodies.filter(function(body) {
+Game.prototype.isColliding = function(rectangle, ignore) {
+	return this.bodies.some(function(body) {
 		if(ignore && ignore.indexOf(body) >= 0) return false;
 		return body.collidable && rectangle.isColliding(body.getRectangle());
 	});

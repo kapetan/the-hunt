@@ -113,8 +113,8 @@ Game.prototype.stop = function() {
 	this._state = null;
 };
 
-Game.prototype.getCollisions = function(rectangle, ignore) {
-	return this.bodies.filter(function(body) {
+Game.prototype.isColliding = function(rectangle, ignore) {
+	return this.bodies.some(function(body) {
 		if(ignore && ignore.indexOf(body) >= 0) return false;
 		return body.collidable && rectangle.isColliding(body.getRectangle());
 	});
@@ -133,7 +133,7 @@ Game.prototype._getPosition = function() {
 		var y = Math.random() * this.size.height;
 
 		rectangle = new Rectangle({ x: x, y: y }, size, 0);
-	} while(this.getCollisions(rectangle).length || !this.inBounds(rectangle));
+	} while(this.isColliding(rectangle) || !this.inBounds(rectangle));
 
 	return rectangle.position;
 };

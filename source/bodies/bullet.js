@@ -92,7 +92,7 @@ Bullet.prototype.update = function(dt) {
 	var game = this.game;
 	var bounds = this.getRectangle();
 
-	if(!game.inBounds(bounds) || game.getCollisions(bounds, [this, this.player]).length) {
+	if(!game.inBounds(bounds) || game.isColliding(bounds, [this, this.player])) {
 		explosion(game, this.position);
 		explosion(game, this.position, [255, 163, 18]);
 
