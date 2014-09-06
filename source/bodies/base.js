@@ -1,5 +1,4 @@
 var util = require('util');
-var events = require('events');
 var extend = require('xtend');
 
 var math = require('../math');
@@ -12,8 +11,6 @@ var rgba = function(color, alpha) {
 };
 
 var Base = function(game, options) {
-	events.EventEmitter.call(this);
-
 	options = options || {};
 
 	this.game = game;
@@ -24,8 +21,6 @@ var Base = function(game, options) {
 	this.visibility = (options.visibility === undefined) ? 1 : options.visibility;
 	this.color = options.color || COLOR;
 };
-
-util.inherits(Base, events.EventEmitter);
 
 Base.prototype.getRectangle = function() {
 	return new Rectangle(this.position, this.size, this.direction);

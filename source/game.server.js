@@ -65,15 +65,6 @@ Game.prototype.addPlayer = function(socket, options) {
 	var self = this;
 	var player = new Player(this, socket, options);
 
-	player.on('bullet', function(bullet) {
-		var players = self._getPlayerState();
-		var state = find(players, { id: player.id });
-
-		state.bullet = bullet.toJSON();
-
-		self.emit('player_state', { players: players, t: Date.now() });
-	});
-
 	this.players.push(player);
 	this.addBody(player);
 
@@ -83,6 +74,16 @@ Game.prototype.addPlayer = function(socket, options) {
 Game.prototype.removePlayer = function(player) {
 	this.removeBody(player);
 	remove(this.players, player);
+};
+
+Game.prototype.addBullet = function(bullet) {
+	var players = this._getPlayerState();
+	var state = find(players, { id: bullet.player.id });
+
+	state.bullet = bullet.toJSON();
+
+	this.addBody(bullet);
+	this.emit('player_state', { players: players, t: Date.now() });
 };
 
 Game.prototype.start = function() {

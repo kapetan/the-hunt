@@ -71,10 +71,8 @@ Player.prototype.processInput = function(input, dt) {
 		next.y = position.y + d.y * this.speed * dt;
 	} else {
 		if(input.shoot && this.ammunition >= 1) {
-			var bullet = this.shoot();
-
+			this.shoot();
 			this.ammunition = 0;
-			this.emit('bullet', bullet);
 		}
 		if(input.left) {
 			next.direction = this.direction - ROTATION_SPEED * dt;
@@ -106,9 +104,7 @@ Player.prototype.processInput = function(input, dt) {
 
 Player.prototype.shoot = function(options) {
 	var bullet = new Bullet(this.game, this, options);
-	this.game.addBody(bullet);
-
-	return bullet;
+	this.game.addBullet(bullet);
 };
 
 Player.prototype.visibilityOf = function(pointOrBody) {

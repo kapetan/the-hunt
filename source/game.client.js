@@ -100,6 +100,10 @@ Game.prototype.removeBody = function(body) {
 	else remove(this.bodies, body);
 };
 
+Game.prototype.addBullet = function(bullet) {
+	this.addBody(bullet);
+};
+
 Game.prototype.start = function() {
 	var self = this;
 
