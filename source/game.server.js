@@ -1,11 +1,10 @@
-var events = require('events');
 var util = require('util');
 var extend = require('xtend');
 
+var Core = require('./game');
 var Rectangle = require('./bodies/rectangle');
 var Player = require('./bodies/player.server');
 
-var append = require('./utils/append');
 var remove = require('./utils/remove');
 var find = require('./utils/find');
 
@@ -16,45 +15,14 @@ var EMIT_POSITION_FREQUENCY = 45;
 var CLEAR_RADIUS = 50;
 
 var Game = function(size) {
-	events.EventEmitter.call(this);
+	Core.call(this, size, level);
 
-	this.size = size;
-	this.bounds = Rectangle.aligned({ x: 0, y: 0 }, this.size, 0);
-	this.bodies = [];
 	this.players = [];
-
 	this._update = null;
 	this._state = null;
-
-	this._add = [];
-	this._remove = [];
-
-	this.level = level(this);
 };
 
-util.inherits(Game, events.EventEmitter);
-
-Game.prototype.update = function(dt) {
-	append(this.bodies, this._add);
-	remove(this.bodies, this._remove);
-
-	this._add = [];
-	this._remove = [];
-
-	this.bodies.forEach(function(body) {
-		body.update(dt);
-	});
-};
-
-Game.prototype.addBody = function(body) {
-	if(this._update) this._add.push(body);
-	else this.bodies.push(body);
-};
-
-Game.prototype.removeBody = function(body) {
-	if(this._update) this._remove.push(body);
-	else remove(this.bodies, body);
-};
+util.inherits(Game, Core);
 
 Game.prototype.addPlayer = function(socket, options) {
 	options = extend({
@@ -84,6 +52,8 @@ Game.prototype.addBullet = function(player, bullet) {
 };
 
 Game.prototype.start = function() {
+	Core.prototype.start.call(this);
+
 	var self = this;
 	var lastTick = Date.now();
 
@@ -104,22 +74,13 @@ Game.prototype.start = function() {
 };
 
 Game.prototype.stop = function() {
+	Core.prototype.stop.call(this);
+
 	clearInterval(this._update);
 	clearTimeout(this._state);
 
 	this._update = null;
 	this._state = null;
-};
-
-Game.prototype.isColliding = function(rectangle, ignore) {
-	return this.bodies.some(function(body) {
-		if(ignore && ignore.indexOf(body) >= 0) return false;
-		return body.collidable && rectangle.isColliding(body.getRectangle());
-	});
-};
-
-Game.prototype.inBounds = function(rectangle) {
-	return this.bounds.isRectangleInside(rectangle);
 };
 
 Game.prototype._getPosition = function() {

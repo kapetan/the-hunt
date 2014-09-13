@@ -1,4 +1,309 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+function EventEmitter() {
+  this._events = this._events || {};
+  this._maxListeners = this._maxListeners || undefined;
+}
+module.exports = EventEmitter;
+
+// Backwards-compat with node 0.10.x
+EventEmitter.EventEmitter = EventEmitter;
+
+EventEmitter.prototype._events = undefined;
+EventEmitter.prototype._maxListeners = undefined;
+
+// By default EventEmitters will print a warning if more than 10 listeners are
+// added to it. This is a useful default which helps finding memory leaks.
+EventEmitter.defaultMaxListeners = 10;
+
+// Obviously not all Emitters should be limited to 10. This function allows
+// that to be increased. Set to zero for unlimited.
+EventEmitter.prototype.setMaxListeners = function(n) {
+  if (!isNumber(n) || n < 0 || isNaN(n))
+    throw TypeError('n must be a positive number');
+  this._maxListeners = n;
+  return this;
+};
+
+EventEmitter.prototype.emit = function(type) {
+  var er, handler, len, args, i, listeners;
+
+  if (!this._events)
+    this._events = {};
+
+  // If there is no 'error' event listener then throw.
+  if (type === 'error') {
+    if (!this._events.error ||
+        (isObject(this._events.error) && !this._events.error.length)) {
+      er = arguments[1];
+      if (er instanceof Error) {
+        throw er; // Unhandled 'error' event
+      } else {
+        throw TypeError('Uncaught, unspecified "error" event.');
+      }
+      return false;
+    }
+  }
+
+  handler = this._events[type];
+
+  if (isUndefined(handler))
+    return false;
+
+  if (isFunction(handler)) {
+    switch (arguments.length) {
+      // fast cases
+      case 1:
+        handler.call(this);
+        break;
+      case 2:
+        handler.call(this, arguments[1]);
+        break;
+      case 3:
+        handler.call(this, arguments[1], arguments[2]);
+        break;
+      // slower
+      default:
+        len = arguments.length;
+        args = new Array(len - 1);
+        for (i = 1; i < len; i++)
+          args[i - 1] = arguments[i];
+        handler.apply(this, args);
+    }
+  } else if (isObject(handler)) {
+    len = arguments.length;
+    args = new Array(len - 1);
+    for (i = 1; i < len; i++)
+      args[i - 1] = arguments[i];
+
+    listeners = handler.slice();
+    len = listeners.length;
+    for (i = 0; i < len; i++)
+      listeners[i].apply(this, args);
+  }
+
+  return true;
+};
+
+EventEmitter.prototype.addListener = function(type, listener) {
+  var m;
+
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  if (!this._events)
+    this._events = {};
+
+  // To avoid recursion in the case that type === "newListener"! Before
+  // adding it to the listeners, first emit "newListener".
+  if (this._events.newListener)
+    this.emit('newListener', type,
+              isFunction(listener.listener) ?
+              listener.listener : listener);
+
+  if (!this._events[type])
+    // Optimize the case of one listener. Don't need the extra array object.
+    this._events[type] = listener;
+  else if (isObject(this._events[type]))
+    // If we've already got an array, just append.
+    this._events[type].push(listener);
+  else
+    // Adding the second element, need to change to array.
+    this._events[type] = [this._events[type], listener];
+
+  // Check for listener leak
+  if (isObject(this._events[type]) && !this._events[type].warned) {
+    var m;
+    if (!isUndefined(this._maxListeners)) {
+      m = this._maxListeners;
+    } else {
+      m = EventEmitter.defaultMaxListeners;
+    }
+
+    if (m && m > 0 && this._events[type].length > m) {
+      this._events[type].warned = true;
+      console.error('(node) warning: possible EventEmitter memory ' +
+                    'leak detected. %d listeners added. ' +
+                    'Use emitter.setMaxListeners() to increase limit.',
+                    this._events[type].length);
+      if (typeof console.trace === 'function') {
+        // not supported in IE 10
+        console.trace();
+      }
+    }
+  }
+
+  return this;
+};
+
+EventEmitter.prototype.on = EventEmitter.prototype.addListener;
+
+EventEmitter.prototype.once = function(type, listener) {
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  var fired = false;
+
+  function g() {
+    this.removeListener(type, g);
+
+    if (!fired) {
+      fired = true;
+      listener.apply(this, arguments);
+    }
+  }
+
+  g.listener = listener;
+  this.on(type, g);
+
+  return this;
+};
+
+// emits a 'removeListener' event iff the listener was removed
+EventEmitter.prototype.removeListener = function(type, listener) {
+  var list, position, length, i;
+
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  if (!this._events || !this._events[type])
+    return this;
+
+  list = this._events[type];
+  length = list.length;
+  position = -1;
+
+  if (list === listener ||
+      (isFunction(list.listener) && list.listener === listener)) {
+    delete this._events[type];
+    if (this._events.removeListener)
+      this.emit('removeListener', type, listener);
+
+  } else if (isObject(list)) {
+    for (i = length; i-- > 0;) {
+      if (list[i] === listener ||
+          (list[i].listener && list[i].listener === listener)) {
+        position = i;
+        break;
+      }
+    }
+
+    if (position < 0)
+      return this;
+
+    if (list.length === 1) {
+      list.length = 0;
+      delete this._events[type];
+    } else {
+      list.splice(position, 1);
+    }
+
+    if (this._events.removeListener)
+      this.emit('removeListener', type, listener);
+  }
+
+  return this;
+};
+
+EventEmitter.prototype.removeAllListeners = function(type) {
+  var key, listeners;
+
+  if (!this._events)
+    return this;
+
+  // not listening for removeListener, no need to emit
+  if (!this._events.removeListener) {
+    if (arguments.length === 0)
+      this._events = {};
+    else if (this._events[type])
+      delete this._events[type];
+    return this;
+  }
+
+  // emit removeListener for all listeners on all events
+  if (arguments.length === 0) {
+    for (key in this._events) {
+      if (key === 'removeListener') continue;
+      this.removeAllListeners(key);
+    }
+    this.removeAllListeners('removeListener');
+    this._events = {};
+    return this;
+  }
+
+  listeners = this._events[type];
+
+  if (isFunction(listeners)) {
+    this.removeListener(type, listeners);
+  } else {
+    // LIFO order
+    while (listeners.length)
+      this.removeListener(type, listeners[listeners.length - 1]);
+  }
+  delete this._events[type];
+
+  return this;
+};
+
+EventEmitter.prototype.listeners = function(type) {
+  var ret;
+  if (!this._events || !this._events[type])
+    ret = [];
+  else if (isFunction(this._events[type]))
+    ret = [this._events[type]];
+  else
+    ret = this._events[type].slice();
+  return ret;
+};
+
+EventEmitter.listenerCount = function(emitter, type) {
+  var ret;
+  if (!emitter._events || !emitter._events[type])
+    ret = 0;
+  else if (isFunction(emitter._events[type]))
+    ret = 1;
+  else
+    ret = emitter._events[type].length;
+  return ret;
+};
+
+function isFunction(arg) {
+  return typeof arg === 'function';
+}
+
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
+
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
+
+function isUndefined(arg) {
+  return arg === void 0;
+}
+
+},{}],2:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -23,7 +328,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],2:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -88,7 +393,7 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}],3:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -174,7 +479,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -261,20 +566,20 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":3,"./encode":4}],6:[function(require,module,exports){
+},{"./decode":4,"./encode":5}],7:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -864,7 +1169,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require("FWaASH"),typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":6,"FWaASH":2,"inherits":1}],8:[function(require,module,exports){
+},{"./support/isBuffer":7,"FWaASH":3,"inherits":2}],9:[function(require,module,exports){
 module.exports = extend
 
 function extend() {
@@ -883,7 +1188,7 @@ function extend() {
     return target
 }
 
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 var util = require('util');
 var extend = require('xtend');
 
@@ -936,7 +1241,7 @@ Base.prototype.distanceTo = function(bodyOrPoint) {
 
 module.exports = Base;
 
-},{"../math":24,"./rectangle":14,"util":7,"xtend":8}],10:[function(require,module,exports){
+},{"../math":26,"./rectangle":15,"util":8,"xtend":9}],11:[function(require,module,exports){
 var util = require('util');
 var extend = require('xtend');
 
@@ -1085,7 +1390,7 @@ Bullet.prototype.toJSON = function() {
 
 module.exports = Bullet;
 
-},{"../math":24,"./base":9,"./rectangle":14,"util":7,"xtend":8}],11:[function(require,module,exports){
+},{"../math":26,"./base":10,"./rectangle":15,"util":8,"xtend":9}],12:[function(require,module,exports){
 var util = require('util');
 
 var math = require('../math');
@@ -1158,7 +1463,7 @@ FootTrack.prototype.update = function(dt) {
 
 module.exports = FootTrack;
 
-},{"../math":24,"./base":9,"util":7}],12:[function(require,module,exports){
+},{"../math":26,"./base":10,"util":8}],13:[function(require,module,exports){
 var util = require('util');
 
 var Player = require('./player');
@@ -1235,7 +1540,7 @@ LocalPlayer.prototype.reconcile = function(update) {
 
 module.exports = LocalPlayer;
 
-},{"../utils/find":27,"./bullet":10,"./player":13,"util":7}],13:[function(require,module,exports){
+},{"../utils/find":29,"./bullet":11,"./player":14,"util":8}],14:[function(require,module,exports){
 var util = require('util');
 var extend = require('xtend');
 
@@ -1359,7 +1664,7 @@ Player.prototype.toJSON = function() {
 
 module.exports = Player;
 
-},{"../math":24,"./base":9,"./foot-track":11,"./rectangle":14,"util":7,"xtend":8}],14:[function(require,module,exports){
+},{"../math":26,"./base":10,"./foot-track":12,"./rectangle":15,"util":8,"xtend":9}],15:[function(require,module,exports){
 var math = require('../math');
 var colliding = require('../colliding');
 var intersections = require('../intersections');
@@ -1443,7 +1748,7 @@ Rectangle.prototype.isPointInside = function(point) {
 
 module.exports = Rectangle;
 
-},{"../colliding":16,"../intersections":19,"../math":24}],15:[function(require,module,exports){
+},{"../colliding":17,"../intersections":21,"../math":26}],16:[function(require,module,exports){
 var util = require('util');
 
 var Player = require('./player');
@@ -1519,7 +1824,7 @@ RemotePlayer.prototype._shoot = function(time) {
 
 module.exports = RemotePlayer;
 
-},{"../math":24,"./bullet":10,"./player":13,"util":7}],16:[function(require,module,exports){
+},{"../math":26,"./bullet":11,"./player":14,"util":8}],17:[function(require,module,exports){
 var subtract = function(p1, p2) {
 	return { x: p1.x - p2.x, y: p1.y - p2.y };
 };
@@ -1569,17 +1874,16 @@ module.exports = function(p1, p2) {
 		isOverlaping(subtract(p2[1], p2[2]), p1, p2);
 };
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
+var util = require('util');
 var extend = require('xtend');
 
-var Rectangle = require('./bodies/rectangle');
+var Core = require('./game');
 var LocalPlayer = require('./bodies/local-player.client');
 var RemotePlayer = require('./bodies/remote-player.client');
 var Keyboard = require('./keyboard');
 var Mouse = require('./mouse');
 
-var math = require('./math');
-var append = require('./utils/append');
 var remove = require('./utils/remove');
 var find = require('./utils/find');
 
@@ -1603,16 +1907,15 @@ InputController.prototype.__defineGetter__('input', function() {
 });
 
 var Game = function(element, options) {
-	this._options = options || {};
 	element = document.getElementById(element);
 
+	Core.call(this, { width: element.width, height: element.height }, level);
+
+	this._options = options || {};
 	this.element = element;
 	this.canvas = element.getContext('2d');
-	this.size = { width: element.width, height: element.height };
-	this.bounds = Rectangle.aligned({ x: 0, y: 0 }, this.size, 0);
 
 	this.player = null;
-	this.bodies = [];
 	this.others = [];
 
 	this._animation = null;
@@ -1620,23 +1923,12 @@ var Game = function(element, options) {
 	this._emit = null;
 	this._socket = null;
 	this._time = { u: 0, v: 0 };
-
-	this._add = [];
-	this._remove = [];
-
-	this.level = level(this);
 };
 
+util.inherits(Game, Core);
+
 Game.prototype.update = function(dt) {
-	append(this.bodies, this._add);
-	remove(this.bodies, this._remove);
-
-	this._add = [];
-	this._remove = [];
-
-	this.bodies.forEach(function(body) {
-		body.update(dt);
-	});
+	Core.prototype.update.call(this, dt);
 
 	var time = this._time.v - UPDATE_OFFSET;
 
@@ -1660,22 +1952,14 @@ Game.prototype.draw = function() {
 	});
 };
 
-Game.prototype.addBody = function(body) {
-	if(this._update) this._add.push(body);
-	else this.bodies.push(body);
-};
-
-Game.prototype.removeBody = function(body) {
-	if(this._update) this._remove.push(body);
-	else remove(this.bodies, body);
-};
-
 Game.prototype.addBullet = function(bullet) {
 	this.addBody(bullet);
 	this._addBulletRemote();
 };
 
 Game.prototype.start = function() {
+	Core.prototype.start.call(this);
+
 	var self = this;
 
 	if(this._options.offline) {
@@ -1701,6 +1985,8 @@ Game.prototype.start = function() {
 };
 
 Game.prototype.stop = function() {
+	Core.prototype.stop.call(this);
+
 	cancelAnimationFrame(this._animation);
 	clearInterval(this._update);
 	clearInterval(this._emit);
@@ -1712,51 +1998,11 @@ Game.prototype.stop = function() {
 	this._socket = null;
 };
 
-Game.prototype.isColliding = function(rectangle, ignore) {
-	return this.bodies.some(function(body) {
-		if(ignore && ignore.indexOf(body) >= 0) return false;
-		return body.collidable && rectangle.isColliding(body.getRectangle());
-	});
-};
-
-Game.prototype.inBounds = function(rectangle) {
-	return this.bounds.isRectangleInside(rectangle);
-};
-
 Game.prototype.hitscan = function(source) {
-	var position = source.position;
-	var direction = source.direction;
+	var hit = Core.prototype.hitscan.call(this, source);
+	hit.t = this._time.v;
 
-	var hit;
-	var distance;
-	var body;
-
-	this.bodies.forEach(function(b) {
-		if(b === source || !b.collidable) return;
-
-		var rectangle = b.getRectangle();
-		var intersections = rectangle.getIntersections(position, direction);
-
-		if(!intersections.length) return;
-
-		intersections.forEach(function(p) {
-			var d = math.distance(position, p);
-
-			if(distance === undefined || d < distance) {
-				hit = p;
-				distance = d;
-				body = b;
-			}
-		});
-	});
-
-	if(!hit) hit = this.bounds.getIntersections(position, direction)[0];
-
-	return {
-		position: hit,
-		body: body && body.id,
-		t: this._time.v
-	};
+	return hit;
 };
 
 Game.prototype._initializeLocal = function(options) {
@@ -1881,7 +2127,111 @@ Game.prototype._synchronizeTime = function(callback) {
 
 module.exports = Game;
 
-},{"./bodies/local-player.client":12,"./bodies/rectangle":14,"./bodies/remote-player.client":15,"./keyboard":20,"./levels/level-1":22,"./math":24,"./mouse":25,"./utils/append":26,"./utils/find":27,"./utils/remove":28,"xtend":8}],18:[function(require,module,exports){
+},{"./bodies/local-player.client":13,"./bodies/remote-player.client":16,"./game":19,"./keyboard":22,"./levels/level-1":24,"./mouse":27,"./utils/find":29,"./utils/remove":30,"util":8,"xtend":9}],19:[function(require,module,exports){
+var events = require('events');
+var util = require('util');
+
+var Rectangle = require('./bodies/rectangle');
+
+var math = require('./math');
+var append = require('./utils/append');
+var remove = require('./utils/remove');
+
+var Game = function(size, level) {
+	events.EventEmitter.call(this);
+
+	this.size = size;
+	this.bounds = Rectangle.aligned({ x: 0, y: 0 }, this.size, 0);
+	this.bodies = [];
+
+	this._running = false;
+	this._add = [];
+	this._remove = [];
+
+	this.level = level(this);
+};
+
+util.inherits(Game, events.EventEmitter);
+
+Game.prototype.start = function() {
+	this._running = true;
+};
+
+Game.prototype.stop = function() {
+	this._running = false;
+};
+
+Game.prototype.update = function(dt) {
+	append(this.bodies, this._add);
+	remove(this.bodies, this._remove);
+
+	this._add = [];
+	this._remove = [];
+
+	this.bodies.forEach(function(body) {
+		body.update(dt);
+	});
+};
+
+Game.prototype.addBody = function(body) {
+	if(this._running) this._add.push(body);
+	else this.bodies.push(body);
+};
+
+Game.prototype.removeBody = function(body) {
+	if(this._running) this._remove.push(body);
+	else remove(this.bodies, body);
+};
+
+Game.prototype.isColliding = function(rectangle, ignore) {
+	return this.bodies.some(function(body) {
+		if(ignore && ignore.indexOf(body) >= 0) return false;
+		return body.collidable && rectangle.isColliding(body.getRectangle());
+	});
+};
+
+Game.prototype.inBounds = function(rectangle) {
+	return this.bounds.isRectangleInside(rectangle);
+};
+
+Game.prototype.hitscan = function(source) {
+	var position = source.position;
+	var direction = source.direction;
+
+	var hit;
+	var distance;
+	var body;
+
+	this.bodies.forEach(function(b) {
+		if(b === source || !b.collidable) return;
+
+		var rectangle = b.getRectangle();
+		var intersections = rectangle.getIntersections(position, direction);
+
+		if(!intersections.length) return;
+
+		intersections.forEach(function(p) {
+			var d = math.distance(position, p);
+
+			if(distance === undefined || d < distance) {
+				hit = p;
+				distance = d;
+				body = b;
+			}
+		});
+	});
+
+	if(!hit) hit = this.bounds.getIntersections(position, direction)[0];
+
+	return {
+		position: hit,
+		body: body && body.id
+	};
+};
+
+module.exports = Game;
+
+},{"./bodies/rectangle":15,"./math":26,"./utils/append":28,"./utils/remove":30,"events":1,"util":8}],20:[function(require,module,exports){
 var qs = require('querystring');
 var Game = require('./game.client');
 
@@ -1895,7 +2245,7 @@ game.start();
 
 window.game = game;
 
-},{"./game.client":17,"querystring":5}],19:[function(require,module,exports){
+},{"./game.client":18,"querystring":6}],21:[function(require,module,exports){
 var EPSILON = Math.pow(10, -5);
 
 var equal = function(number, target) {
@@ -1948,7 +2298,7 @@ module.exports = function(point, direction, polygon) {
 	return intersections;
 };
 
-},{}],20:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 var KEYS = {
 	37: 'left',
 	38: 'up',
@@ -1986,7 +2336,7 @@ var Keyboard = function() {
 
 module.exports = Keyboard;
 
-},{}],21:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 var util = require('util');
 
 var DENSITY = 0.1;
@@ -2046,7 +2396,7 @@ Fog.prototype.reveal = function(body) {
 
 module.exports = Fog;
 
-},{"util":7}],22:[function(require,module,exports){
+},{"util":8}],24:[function(require,module,exports){
 var wall = require('./wall');
 var Fog = require('./fog');
 
@@ -2062,7 +2412,7 @@ module.exports = function(game) {
 	};
 };
 
-},{"./fog":21,"./wall":23}],23:[function(require,module,exports){
+},{"./fog":23,"./wall":25}],25:[function(require,module,exports){
 var util = require('util');
 
 var math = require('../math');
@@ -2120,7 +2470,7 @@ var wall = function(game, point, segments) {
 
 module.exports = wall;
 
-},{"../bodies/base":9,"../math":24,"util":7}],24:[function(require,module,exports){
+},{"../bodies/base":10,"../math":26,"util":8}],26:[function(require,module,exports){
 var lerp = function(v1, v2, t) {
 	return v1 + t * (v2 - v1);
 };
@@ -2185,7 +2535,7 @@ exports.lerp = function(p1, p2, t) {
 	return { x: lerp(p1.x, p2.x, t), y: lerp(p1.y, p2.y, t) };
 };
 
-},{}],25:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 var Mouse = function(element) {
 	var local = {};
 	var input = this.input = {};
@@ -2207,7 +2557,7 @@ var Mouse = function(element) {
 
 module.exports = Mouse;
 
-},{}],26:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 module.exports = function(arr, items) {
 	if(!Array.isArray(items)) items = [items];
 
@@ -2216,7 +2566,7 @@ module.exports = function(arr, items) {
 	});
 };
 
-},{}],27:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 var find = function(arr, fn) {
 	for(var i = 0; i < arr.length; i++) {
 		var item = arr[i];
@@ -2237,7 +2587,7 @@ module.exports = function(arr, obj) {
 	return find(arr, fn);
 };
 
-},{}],28:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 var remove = function(arr, item) {
 	var i = arr.indexOf(item);
 	if(i >= 0) arr.splice(i, 1);
@@ -2253,4 +2603,4 @@ module.exports = function(arr, item) {
 	}
 };
 
-},{}]},{},[18])
+},{}]},{},[20])

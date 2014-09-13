@@ -1,13 +1,12 @@
+var util = require('util');
 var extend = require('xtend');
 
-var Rectangle = require('./bodies/rectangle');
+var Core = require('./game');
 var LocalPlayer = require('./bodies/local-player.client');
 var RemotePlayer = require('./bodies/remote-player.client');
 var Keyboard = require('./keyboard');
 var Mouse = require('./mouse');
 
-var math = require('./math');
-var append = require('./utils/append');
 var remove = require('./utils/remove');
 var find = require('./utils/find');
 
@@ -31,16 +30,15 @@ InputController.prototype.__defineGetter__('input', function() {
 });
 
 var Game = function(element, options) {
-	this._options = options || {};
 	element = document.getElementById(element);
 
+	Core.call(this, { width: element.width, height: element.height }, level);
+
+	this._options = options || {};
 	this.element = element;
 	this.canvas = element.getContext('2d');
-	this.size = { width: element.width, height: element.height };
-	this.bounds = Rectangle.aligned({ x: 0, y: 0 }, this.size, 0);
 
 	this.player = null;
-	this.bodies = [];
 	this.others = [];
 
 	this._animation = null;
@@ -48,23 +46,12 @@ var Game = function(element, options) {
 	this._emit = null;
 	this._socket = null;
 	this._time = { u: 0, v: 0 };
-
-	this._add = [];
-	this._remove = [];
-
-	this.level = level(this);
 };
 
+util.inherits(Game, Core);
+
 Game.prototype.update = function(dt) {
-	append(this.bodies, this._add);
-	remove(this.bodies, this._remove);
-
-	this._add = [];
-	this._remove = [];
-
-	this.bodies.forEach(function(body) {
-		body.update(dt);
-	});
+	Core.prototype.update.call(this, dt);
 
 	var time = this._time.v - UPDATE_OFFSET;
 
@@ -88,22 +75,14 @@ Game.prototype.draw = function() {
 	});
 };
 
-Game.prototype.addBody = function(body) {
-	if(this._update) this._add.push(body);
-	else this.bodies.push(body);
-};
-
-Game.prototype.removeBody = function(body) {
-	if(this._update) this._remove.push(body);
-	else remove(this.bodies, body);
-};
-
 Game.prototype.addBullet = function(bullet) {
 	this.addBody(bullet);
 	this._addBulletRemote();
 };
 
 Game.prototype.start = function() {
+	Core.prototype.start.call(this);
+
 	var self = this;
 
 	if(this._options.offline) {
@@ -129,6 +108,8 @@ Game.prototype.start = function() {
 };
 
 Game.prototype.stop = function() {
+	Core.prototype.stop.call(this);
+
 	cancelAnimationFrame(this._animation);
 	clearInterval(this._update);
 	clearInterval(this._emit);
@@ -140,51 +121,11 @@ Game.prototype.stop = function() {
 	this._socket = null;
 };
 
-Game.prototype.isColliding = function(rectangle, ignore) {
-	return this.bodies.some(function(body) {
-		if(ignore && ignore.indexOf(body) >= 0) return false;
-		return body.collidable && rectangle.isColliding(body.getRectangle());
-	});
-};
-
-Game.prototype.inBounds = function(rectangle) {
-	return this.bounds.isRectangleInside(rectangle);
-};
-
 Game.prototype.hitscan = function(source) {
-	var position = source.position;
-	var direction = source.direction;
+	var hit = Core.prototype.hitscan.call(this, source);
+	hit.t = this._time.v;
 
-	var hit;
-	var distance;
-	var body;
-
-	this.bodies.forEach(function(b) {
-		if(b === source || !b.collidable) return;
-
-		var rectangle = b.getRectangle();
-		var intersections = rectangle.getIntersections(position, direction);
-
-		if(!intersections.length) return;
-
-		intersections.forEach(function(p) {
-			var d = math.distance(position, p);
-
-			if(distance === undefined || d < distance) {
-				hit = p;
-				distance = d;
-				body = b;
-			}
-		});
-	});
-
-	if(!hit) hit = this.bounds.getIntersections(position, direction)[0];
-
-	return {
-		position: hit,
-		body: body && body.id,
-		t: this._time.v
-	};
+	return hit;
 };
 
 Game.prototype._initializeLocal = function(options) {
