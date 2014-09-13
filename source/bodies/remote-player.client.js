@@ -59,8 +59,10 @@ RemotePlayer.prototype._getUpdates = function(time) {
 };
 
 RemotePlayer.prototype._shoot = function(time) {
-	var options = this.bullets.shift();
+	var options = this.bullets[0];
 	if(!options || options.hit.t > time) return;
+
+	this.bullets.shift();
 
 	var hit = options.hit;
 	var bullet = new Bullet(this.game, this, hit.position, options.shoot);
