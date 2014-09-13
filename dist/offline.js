@@ -1492,8 +1492,8 @@ Game.prototype.removeBody = function(body) {
 };
 
 Game.prototype.addBullet = function(bullet) {
-	this._socket.emit('update', this.player.drain());
 	this.addBody(bullet);
+	this._addBulletRemote();
 };
 
 Game.prototype.start = function() {
@@ -1642,6 +1642,10 @@ Game.prototype._initializeRemote = function() {
 		var updates = self.player.drain();
 		if(updates.length) socket.emit('update', updates);
 	}, EMIT_UPDATES_FREQUENCY);
+};
+
+Game.prototype._addBulletRemote = function() {
+	if(this._socket) this._socket.emit('update', this.player.drain());
 };
 
 Game.prototype._createPlayer = function(options) {
