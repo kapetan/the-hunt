@@ -5,8 +5,9 @@ var math = require('../math');
 var Base = require('./base');
 var Rectangle = require('./rectangle');
 
-var RADIUS = 4;
-var SPEED = 0.5;
+var RADIUS = 3;
+var SPEED = 0.8;
+var HIT_TOLERANCE = Math.pow(10, -1);
 
 var PARTICLE_COUNT = 10;
 var MIN_PARTICLE_SIZE = 5;
@@ -70,39 +71,53 @@ Particle.prototype.isVisible = function() {
 	return this.size.width > 0 && this.size.height > 0;
 };
 
-var Bullet = function(game, player, options) {
+var Bullet = function(game, player, hit, options) {
 	this.game = game;
 	this.player = player;
+	this.hit = hit;
+
+	var position = math.translate(player.position, player.direction, player.size.width / 2 + RADIUS + 1);
 
 	options = extend({
-		position: player.position,
+		position: position,
 		direction: player.direction,
 		visibility: 1
 	}, options);
 
 	this.active = true;
-	this.collidable = true;
+	this.collidable = false;
 
-	this.position = math.translate(options.position, options.direction, player.size.width / 2 + RADIUS + 1);
+	this.position = options.position;
 	this.direction = options.direction;
 	this.visibility = options.visibility;
 };
 
 Bullet.prototype.update = function(dt) {
-	var game = this.game;
-	var bounds = this.getRectangle();
+	var d = math.distance(this.position, this.hit);
 
-	if(!game.inBounds(bounds) || game.isColliding(bounds, [this, this.player])) {
-		explosion(game, this.position);
-		explosion(game, this.position, [255, 163, 18]);
-
-		game.removeBody(this);
+	if(d < HIT_TOLERANCE) {
+		this.explode();
 	} else {
-		var next = math.translate(this.position, this.direction, SPEED * dt);
-
-		this.position.x = next.x;
-		this.position.y = next.y;
+		this.move(dt);
 	}
+};
+
+Bullet.prototype.move = function(dt) {
+	var next = math.translate(this.position, this.direction, SPEED * dt);
+	var dp = math.distance(this.position, this.hit);
+	var dn = math.distance(next, this.hit);
+
+	if(dp < dn) next = this.hit;
+
+	this.position.x = next.x;
+	this.position.y = next.y;
+};
+
+Bullet.prototype.explode = function() {
+	explosion(this.game, this.position);
+	explosion(this.game, this.position, [255, 163, 18]);
+
+	this.game.removeBody(this);
 };
 
 Bullet.prototype.draw = function(options) {
@@ -123,7 +138,10 @@ Bullet.prototype.getRectangle = function() {
 };
 
 Bullet.prototype.toJSON = function() {
-	return { position: this.position, direction: this.direction };
+	return {
+		position: { x: this.position.x, y: this.position.y },
+		direction: this.direction
+	};
 };
 
 module.exports = Bullet;

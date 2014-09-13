@@ -1,5 +1,6 @@
 var math = require('../math');
 var colliding = require('../colliding');
+var intersections = require('../intersections');
 
 var getPoints = function(position, size, direction) {
 	var x = position.x;
@@ -47,6 +48,14 @@ var Rectangle = function(position, size, direction) {
 
 Rectangle.aligned = function(position, size) {
 	return new Rectangle({ x: position.x + size.width / 2, y: position.y + size.height / 2 }, size, 0);
+};
+
+Rectangle.prototype.getIntersections = function(point, direction) {
+	if(typeof direction === 'number') {
+		direction = { x: Math.cos(direction), y: Math.sin(direction) };
+	}
+
+	return intersections(point, direction, this.points);
 };
 
 Rectangle.prototype.isColliding = function(rectangle) {

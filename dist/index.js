@@ -936,7 +936,7 @@ Base.prototype.distanceTo = function(bodyOrPoint) {
 
 module.exports = Base;
 
-},{"../math":23,"./rectangle":14,"util":7,"xtend":8}],10:[function(require,module,exports){
+},{"../math":24,"./rectangle":14,"util":7,"xtend":8}],10:[function(require,module,exports){
 var util = require('util');
 var extend = require('xtend');
 
@@ -944,8 +944,9 @@ var math = require('../math');
 var Base = require('./base');
 var Rectangle = require('./rectangle');
 
-var RADIUS = 4;
-var SPEED = 0.5;
+var RADIUS = 3;
+var SPEED = 0.8;
+var HIT_TOLERANCE = Math.pow(10, -1);
 
 var PARTICLE_COUNT = 10;
 var MIN_PARTICLE_SIZE = 5;
@@ -1009,39 +1010,53 @@ Particle.prototype.isVisible = function() {
 	return this.size.width > 0 && this.size.height > 0;
 };
 
-var Bullet = function(game, player, options) {
+var Bullet = function(game, player, hit, options) {
 	this.game = game;
 	this.player = player;
+	this.hit = hit;
+
+	var position = math.translate(player.position, player.direction, player.size.width / 2 + RADIUS + 1);
 
 	options = extend({
-		position: player.position,
+		position: position,
 		direction: player.direction,
 		visibility: 1
 	}, options);
 
 	this.active = true;
-	this.collidable = true;
+	this.collidable = false;
 
-	this.position = math.translate(options.position, options.direction, player.size.width / 2 + RADIUS + 1);
+	this.position = options.position;
 	this.direction = options.direction;
 	this.visibility = options.visibility;
 };
 
 Bullet.prototype.update = function(dt) {
-	var game = this.game;
-	var bounds = this.getRectangle();
+	var d = math.distance(this.position, this.hit);
 
-	if(!game.inBounds(bounds) || game.isColliding(bounds, [this, this.player])) {
-		explosion(game, this.position);
-		explosion(game, this.position, [255, 163, 18]);
-
-		game.removeBody(this);
+	if(d < HIT_TOLERANCE) {
+		this.explode();
 	} else {
-		var next = math.translate(this.position, this.direction, SPEED * dt);
-
-		this.position.x = next.x;
-		this.position.y = next.y;
+		this.move(dt);
 	}
+};
+
+Bullet.prototype.move = function(dt) {
+	var next = math.translate(this.position, this.direction, SPEED * dt);
+	var dp = math.distance(this.position, this.hit);
+	var dn = math.distance(next, this.hit);
+
+	if(dp < dn) next = this.hit;
+
+	this.position.x = next.x;
+	this.position.y = next.y;
+};
+
+Bullet.prototype.explode = function() {
+	explosion(this.game, this.position);
+	explosion(this.game, this.position, [255, 163, 18]);
+
+	this.game.removeBody(this);
 };
 
 Bullet.prototype.draw = function(options) {
@@ -1062,12 +1077,15 @@ Bullet.prototype.getRectangle = function() {
 };
 
 Bullet.prototype.toJSON = function() {
-	return { position: this.position, direction: this.direction };
+	return {
+		position: { x: this.position.x, y: this.position.y },
+		direction: this.direction
+	};
 };
 
 module.exports = Bullet;
 
-},{"../math":23,"./base":9,"./rectangle":14,"util":7,"xtend":8}],11:[function(require,module,exports){
+},{"../math":24,"./base":9,"./rectangle":14,"util":7,"xtend":8}],11:[function(require,module,exports){
 var util = require('util');
 
 var math = require('../math');
@@ -1140,9 +1158,11 @@ FootTrack.prototype.update = function(dt) {
 
 module.exports = FootTrack;
 
-},{"../math":23,"./base":9,"util":7}],12:[function(require,module,exports){
+},{"../math":24,"./base":9,"util":7}],12:[function(require,module,exports){
 var util = require('util');
+
 var Player = require('./player');
+var Bullet = require('./bullet');
 var find = require('../utils/find');
 
 var LocalPlayer = function(game, controller, options) {
@@ -1166,14 +1186,28 @@ LocalPlayer.prototype.update = function(dt) {
 		this.processInput(input, dt);
 
 		var sequence = this.sequence++;
-		var update = {
+
+		this.inputs.push({
 			input: input,
 			sequence: sequence,
 			dt: dt
-		};
+		});
+		this.pending.push({
+			input: input,
+			sequence: sequence
+		});
 
-		this.inputs.push(update);
-		this.pending.push(update);
+		if(this.hasShot()) {
+			var hit = this.game.hitscan(this);
+			var shoot = new Bullet(this.game, this, hit.position);
+
+			this.pending[this.pending.length - 1].bullet = {
+				shoot: shoot,
+				hit: hit
+			};
+
+			this.game.addBullet(shoot);
+		}
 	}
 };
 
@@ -1201,7 +1235,7 @@ LocalPlayer.prototype.reconcile = function(update) {
 
 module.exports = LocalPlayer;
 
-},{"../utils/find":27,"./player":13,"util":7}],13:[function(require,module,exports){
+},{"../utils/find":27,"./bullet":10,"./player":13,"util":7}],13:[function(require,module,exports){
 var util = require('util');
 var extend = require('xtend');
 
@@ -1209,7 +1243,6 @@ var math = require('../math');
 var Rectangle = require('./rectangle');
 var Base = require('./base');
 var FootTrack = require('./foot-track');
-var Bullet = require('./bullet');
 
 var SIZE = { width: 20, height: 20 };
 var ROTATION_SPEED = Math.PI / 800;
@@ -1217,15 +1250,6 @@ var MOVING_SPEED = 0.1;
 var LINE_OF_SIGHT = 90;
 var LINE_OF_SIGHT_EDGE = 10;
 var RELOAD_SPEED = 0.001;
-
-var toJSON = function(obj, properties) {
-	var json = properties.reduce(function(acc, name) {
-		acc[name] = obj[name];
-		return acc;
-	}, {});
-
-	return JSON.parse(JSON.stringify(json));
-};
 
 var Player = function(game, options) {
 	options = extend({
@@ -1275,7 +1299,6 @@ Player.prototype.processInput = function(input, dt) {
 		next.y = position.y + d.y * this.speed * dt;
 	} else {
 		if(input.shoot && this.ammunition >= 1) {
-			this.shoot();
 			this.ammunition = 0;
 		}
 		if(input.left) {
@@ -1306,9 +1329,8 @@ Player.prototype.processInput = function(input, dt) {
 	this.direction = next.direction;
 };
 
-Player.prototype.shoot = function(options) {
-	var bullet = new Bullet(this.game, this, options);
-	this.game.addBullet(bullet);
+Player.prototype.hasShot = function() {
+	return !this.ammunition;
 };
 
 Player.prototype.visibilityOf = function(pointOrBody) {
@@ -1322,14 +1344,25 @@ Player.prototype.visibilityOf = function(pointOrBody) {
 };
 
 Player.prototype.toJSON = function() {
-	return toJSON(this, ['id', 'position', 'size', 'direction', 'visibility', 'speed', 'lineOfSight', 'reloadSpeed', 'ammunition']);
+	return {
+		id: this.id,
+		position: { x: this.position.x, y: this.position.y },
+		size: { width: this.size.width, height: this.size.height },
+		direction: this.direction,
+		visibility: this.visibility,
+		speed: this.speed,
+		lineOfSight: this.lineOfSight,
+		reloadSpeed: this.reloadSpeed,
+		ammunition: this.ammunition
+	};
 };
 
 module.exports = Player;
 
-},{"../math":23,"./base":9,"./bullet":10,"./foot-track":11,"./rectangle":14,"util":7,"xtend":8}],14:[function(require,module,exports){
+},{"../math":24,"./base":9,"./foot-track":11,"./rectangle":14,"util":7,"xtend":8}],14:[function(require,module,exports){
 var math = require('../math');
 var colliding = require('../colliding');
+var intersections = require('../intersections');
 
 var getPoints = function(position, size, direction) {
 	var x = position.x;
@@ -1379,6 +1412,14 @@ Rectangle.aligned = function(position, size) {
 	return new Rectangle({ x: position.x + size.width / 2, y: position.y + size.height / 2 }, size, 0);
 };
 
+Rectangle.prototype.getIntersections = function(point, direction) {
+	if(typeof direction === 'number') {
+		direction = { x: Math.cos(direction), y: Math.sin(direction) };
+	}
+
+	return intersections(point, direction, this.points);
+};
+
 Rectangle.prototype.isColliding = function(rectangle) {
 	return colliding(this.points, rectangle.points);
 };
@@ -1402,10 +1443,11 @@ Rectangle.prototype.isPointInside = function(point) {
 
 module.exports = Rectangle;
 
-},{"../colliding":16,"../math":23}],15:[function(require,module,exports){
+},{"../colliding":16,"../intersections":19,"../math":24}],15:[function(require,module,exports){
 var util = require('util');
 
 var Player = require('./player');
+var Bullet = require('./bullet');
 var math = require('../math');
 
 var UPDATES_SIZE = 60 * 2;
@@ -1416,6 +1458,7 @@ var RemotePlayer = function(game, options) {
 	Player.call(this, game, options);
 
 	this.updates = [];
+	this.bullets = [];
 };
 
 util.inherits(RemotePlayer, Player);
@@ -1427,6 +1470,9 @@ RemotePlayer.prototype.addUpdate = function(update) {
 
 	if(this.updates.length >= UPDATES_SIZE) {
 		this.updates.shift();
+	}
+	if(update.bullet) {
+		this.bullets.push(update.bullet);
 	}
 };
 
@@ -1442,11 +1488,7 @@ RemotePlayer.prototype.interpolate = function(time) {
 
 	this.position = math.lerp(previous.position, next.position, progress);
 	this.direction = (next.direction - previous.direction) * progress + next.direction;
-
-	if(previous.bullet) {
-		this.shoot(previous.bullet);
-		previous.bullet = null;
-	}
+	this._shoot(time);
 };
 
 RemotePlayer.prototype._getUpdates = function(time) {
@@ -1462,9 +1504,20 @@ RemotePlayer.prototype._getUpdates = function(time) {
 	}
 };
 
+RemotePlayer.prototype._shoot = function(time) {
+	var options = this.bullets.shift();
+	if(!options || options.hit.t > time) return;
+
+	var hit = options.hit;
+	var bullet = new Bullet(this.game, this, hit.position, options.shoot);
+
+	bullet.move(time - hit.t);
+	this.game.addBody(bullet);
+};
+
 module.exports = RemotePlayer;
 
-},{"../math":23,"./player":13,"util":7}],16:[function(require,module,exports){
+},{"../math":24,"./bullet":10,"./player":13,"util":7}],16:[function(require,module,exports){
 var subtract = function(p1, p2) {
 	return { x: p1.x - p2.x, y: p1.y - p2.y };
 };
@@ -1523,10 +1576,10 @@ var RemotePlayer = require('./bodies/remote-player.client');
 var Keyboard = require('./keyboard');
 var Mouse = require('./mouse');
 
+var math = require('./math');
 var append = require('./utils/append');
 var remove = require('./utils/remove');
 var find = require('./utils/find');
-var filter = require('./utils/filter');
 
 var level = require('./levels/level-1');
 
@@ -1570,8 +1623,6 @@ var Game = function(element, options) {
 	this._remove = [];
 
 	this.level = level(this);
-
-	level(this);
 };
 
 Game.prototype.update = function(dt) {
@@ -1618,6 +1669,7 @@ Game.prototype.removeBody = function(body) {
 };
 
 Game.prototype.addBullet = function(bullet) {
+	this._socket.emit('update', this.player.drain());
 	this.addBody(bullet);
 };
 
@@ -1667,6 +1719,42 @@ Game.prototype.isColliding = function(rectangle, ignore) {
 
 Game.prototype.inBounds = function(rectangle) {
 	return this.bounds.isRectangleInside(rectangle);
+};
+
+Game.prototype.hitscan = function(source) {
+	var position = source.position;
+	var direction = source.direction;
+
+	var hit;
+	var distance;
+	var body;
+
+	this.bodies.forEach(function(b) {
+		if(b === source || !b.collidable) return;
+
+		var rectangle = b.getRectangle();
+		var intersections = rectangle.getIntersections(position, direction);
+
+		if(!intersections.length) return;
+
+		intersections.forEach(function(p) {
+			var d = math.distance(position, p);
+
+			if(distance === undefined || d < distance) {
+				hit = p;
+				distance = d;
+				body = b;
+			}
+		});
+	});
+
+	if(!hit) hit = this.bounds.getIntersections(position, direction)[0];
+
+	return {
+		position: hit,
+		body: body && body.id,
+		t: this._time.v
+	};
 };
 
 Game.prototype._initializeLocal = function(options) {
@@ -1787,7 +1875,7 @@ Game.prototype._synchronizeTime = function(callback) {
 
 module.exports = Game;
 
-},{"./bodies/local-player.client":12,"./bodies/rectangle":14,"./bodies/remote-player.client":15,"./keyboard":19,"./levels/level-1":21,"./mouse":24,"./utils/append":25,"./utils/filter":26,"./utils/find":27,"./utils/remove":28,"xtend":8}],18:[function(require,module,exports){
+},{"./bodies/local-player.client":12,"./bodies/rectangle":14,"./bodies/remote-player.client":15,"./keyboard":20,"./levels/level-1":22,"./math":24,"./mouse":25,"./utils/append":26,"./utils/find":27,"./utils/remove":28,"xtend":8}],18:[function(require,module,exports){
 var qs = require('querystring');
 var Game = require('./game.client');
 
@@ -1802,6 +1890,59 @@ game.start();
 window.game = game;
 
 },{"./game.client":17,"querystring":5}],19:[function(require,module,exports){
+var EPSILON = Math.pow(10, -5);
+
+var equal = function(number, target) {
+	return (target - EPSILON) < number && number < (target + EPSILON);
+};
+
+module.exports = function(point, direction, polygon) {
+	var intersections = [];
+
+	var x00 = point.x;
+	var y00 = point.y;
+	var x01 = direction.x;
+	var y01 = direction.y;
+
+	polygon.forEach(function(current, i) {
+		var j = (i === polygon.length - 1) ? 0 : (i + 1);
+		var next = polygon[j];
+
+		var x10 = current.x;
+		var y10 = current.y;
+		var x11 = next.x - current.x;
+		var y11 = next.y - current.y;
+
+		var ux = x00 - x10;
+		var uy = y00 - y10;
+
+		if(equal(ux, 0) && equal(uy, 0)) {
+			return intersections.push({ x: x00, y: y00 });
+		}
+
+		var det = x11 * y01 - x01 * y11;
+
+		if(equal(det, 0)) {
+			// Almost parallel
+			return;
+		}
+
+		var inverse = 1 / det;
+		var s = inverse * (ux * y01 - uy * x01);
+		var t = inverse * (ux * y11 - uy * x11);
+
+		var it = equal(t, 0) || t > 0;
+		var is = (equal(s, 0) || s > 0) && (equal(s, 1) || s < 1);
+
+		if(it && is) {
+			intersections.push({ x: x00 + x01 * t, y: y00 + y01 * t });
+		}
+	});
+
+	return intersections;
+};
+
+},{}],20:[function(require,module,exports){
 var KEYS = {
 	37: 'left',
 	38: 'up',
@@ -1839,7 +1980,7 @@ var Keyboard = function() {
 
 module.exports = Keyboard;
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 var util = require('util');
 
 var DENSITY = 0.1;
@@ -1899,7 +2040,7 @@ Fog.prototype.reveal = function(body) {
 
 module.exports = Fog;
 
-},{"util":7}],21:[function(require,module,exports){
+},{"util":7}],22:[function(require,module,exports){
 var wall = require('./wall');
 var Fog = require('./fog');
 
@@ -1915,7 +2056,7 @@ module.exports = function(game) {
 	};
 };
 
-},{"./fog":20,"./wall":22}],22:[function(require,module,exports){
+},{"./fog":21,"./wall":23}],23:[function(require,module,exports){
 var util = require('util');
 
 var math = require('../math');
@@ -1973,7 +2114,7 @@ var wall = function(game, point, segments) {
 
 module.exports = wall;
 
-},{"../bodies/base":9,"../math":23,"util":7}],23:[function(require,module,exports){
+},{"../bodies/base":9,"../math":24,"util":7}],24:[function(require,module,exports){
 var lerp = function(v1, v2, t) {
 	return v1 + t * (v2 - v1);
 };
@@ -2038,7 +2179,7 @@ exports.lerp = function(p1, p2, t) {
 	return { x: lerp(p1.x, p2.x, t), y: lerp(p1.y, p2.y, t) };
 };
 
-},{}],24:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 var Mouse = function(element) {
 	var local = {};
 	var input = this.input = {};
@@ -2060,25 +2201,13 @@ var Mouse = function(element) {
 
 module.exports = Mouse;
 
-},{}],25:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 module.exports = function(arr, items) {
 	if(!Array.isArray(items)) items = [items];
 
 	items.forEach(function(item) {
 		arr.push(item);
 	});
-};
-
-},{}],26:[function(require,module,exports){
-module.exports = function(obj, fn) {
-	var result = {};
-
-	Object.keys(obj).forEach(function(key) {
-		var v = fn(key, obj[key], obj);
-		if(v) result[key] = obj[key];
-	});
-
-	return result;
 };
 
 },{}],27:[function(require,module,exports){

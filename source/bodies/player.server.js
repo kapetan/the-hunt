@@ -25,6 +25,8 @@ ServerPlayer.prototype.update = function(dt) {
 	if(update) {
 		this.processInput(update.input, dt);
 		this.sequence = update.sequence;
+
+		if(update.bullet) this.game.addBullet(this, update.bullet);
 	}
 };
 

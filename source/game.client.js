@@ -6,10 +6,10 @@ var RemotePlayer = require('./bodies/remote-player.client');
 var Keyboard = require('./keyboard');
 var Mouse = require('./mouse');
 
+var math = require('./math');
 var append = require('./utils/append');
 var remove = require('./utils/remove');
 var find = require('./utils/find');
-var filter = require('./utils/filter');
 
 var level = require('./levels/level-1');
 
@@ -53,8 +53,6 @@ var Game = function(element, options) {
 	this._remove = [];
 
 	this.level = level(this);
-
-	level(this);
 };
 
 Game.prototype.update = function(dt) {
@@ -101,6 +99,7 @@ Game.prototype.removeBody = function(body) {
 };
 
 Game.prototype.addBullet = function(bullet) {
+	this._socket.emit('update', this.player.drain());
 	this.addBody(bullet);
 };
 
@@ -150,6 +149,42 @@ Game.prototype.isColliding = function(rectangle, ignore) {
 
 Game.prototype.inBounds = function(rectangle) {
 	return this.bounds.isRectangleInside(rectangle);
+};
+
+Game.prototype.hitscan = function(source) {
+	var position = source.position;
+	var direction = source.direction;
+
+	var hit;
+	var distance;
+	var body;
+
+	this.bodies.forEach(function(b) {
+		if(b === source || !b.collidable) return;
+
+		var rectangle = b.getRectangle();
+		var intersections = rectangle.getIntersections(position, direction);
+
+		if(!intersections.length) return;
+
+		intersections.forEach(function(p) {
+			var d = math.distance(position, p);
+
+			if(distance === undefined || d < distance) {
+				hit = p;
+				distance = d;
+				body = b;
+			}
+		});
+	});
+
+	if(!hit) hit = this.bounds.getIntersections(position, direction)[0];
+
+	return {
+		position: hit,
+		body: body && body.id,
+		t: this._time.v
+	};
 };
 
 Game.prototype._initializeLocal = function(options) {

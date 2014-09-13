@@ -1,5 +1,7 @@
 var util = require('util');
+
 var Player = require('./player');
+var Bullet = require('./bullet');
 var find = require('../utils/find');
 
 var LocalPlayer = function(game, controller, options) {
@@ -23,14 +25,28 @@ LocalPlayer.prototype.update = function(dt) {
 		this.processInput(input, dt);
 
 		var sequence = this.sequence++;
-		var update = {
+
+		this.inputs.push({
 			input: input,
 			sequence: sequence,
 			dt: dt
-		};
+		});
+		this.pending.push({
+			input: input,
+			sequence: sequence
+		});
 
-		this.inputs.push(update);
-		this.pending.push(update);
+		if(this.hasShot()) {
+			var hit = this.game.hitscan(this);
+			var shoot = new Bullet(this.game, this, hit.position);
+
+			this.pending[this.pending.length - 1].bullet = {
+				shoot: shoot,
+				hit: hit
+			};
+
+			this.game.addBullet(shoot);
+		}
 	}
 };
 

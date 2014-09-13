@@ -5,7 +5,6 @@ var math = require('../math');
 var Rectangle = require('./rectangle');
 var Base = require('./base');
 var FootTrack = require('./foot-track');
-var Bullet = require('./bullet');
 
 var SIZE = { width: 20, height: 20 };
 var ROTATION_SPEED = Math.PI / 800;
@@ -13,15 +12,6 @@ var MOVING_SPEED = 0.1;
 var LINE_OF_SIGHT = 90;
 var LINE_OF_SIGHT_EDGE = 10;
 var RELOAD_SPEED = 0.001;
-
-var toJSON = function(obj, properties) {
-	var json = properties.reduce(function(acc, name) {
-		acc[name] = obj[name];
-		return acc;
-	}, {});
-
-	return JSON.parse(JSON.stringify(json));
-};
 
 var Player = function(game, options) {
 	options = extend({
@@ -71,7 +61,6 @@ Player.prototype.processInput = function(input, dt) {
 		next.y = position.y + d.y * this.speed * dt;
 	} else {
 		if(input.shoot && this.ammunition >= 1) {
-			this.shoot();
 			this.ammunition = 0;
 		}
 		if(input.left) {
@@ -102,9 +91,8 @@ Player.prototype.processInput = function(input, dt) {
 	this.direction = next.direction;
 };
 
-Player.prototype.shoot = function(options) {
-	var bullet = new Bullet(this.game, this, options);
-	this.game.addBullet(bullet);
+Player.prototype.hasShot = function() {
+	return !this.ammunition;
 };
 
 Player.prototype.visibilityOf = function(pointOrBody) {
@@ -118,7 +106,17 @@ Player.prototype.visibilityOf = function(pointOrBody) {
 };
 
 Player.prototype.toJSON = function() {
-	return toJSON(this, ['id', 'position', 'size', 'direction', 'visibility', 'speed', 'lineOfSight', 'reloadSpeed', 'ammunition']);
+	return {
+		id: this.id,
+		position: { x: this.position.x, y: this.position.y },
+		size: { width: this.size.width, height: this.size.height },
+		direction: this.direction,
+		visibility: this.visibility,
+		speed: this.speed,
+		lineOfSight: this.lineOfSight,
+		reloadSpeed: this.reloadSpeed,
+		ammunition: this.ammunition
+	};
 };
 
 module.exports = Player;

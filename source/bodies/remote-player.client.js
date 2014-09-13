@@ -1,6 +1,7 @@
 var util = require('util');
 
 var Player = require('./player');
+var Bullet = require('./bullet');
 var math = require('../math');
 
 var UPDATES_SIZE = 60 * 2;
@@ -11,6 +12,7 @@ var RemotePlayer = function(game, options) {
 	Player.call(this, game, options);
 
 	this.updates = [];
+	this.bullets = [];
 };
 
 util.inherits(RemotePlayer, Player);
@@ -22,6 +24,9 @@ RemotePlayer.prototype.addUpdate = function(update) {
 
 	if(this.updates.length >= UPDATES_SIZE) {
 		this.updates.shift();
+	}
+	if(update.bullet) {
+		this.bullets.push(update.bullet);
 	}
 };
 
@@ -37,11 +42,7 @@ RemotePlayer.prototype.interpolate = function(time) {
 
 	this.position = math.lerp(previous.position, next.position, progress);
 	this.direction = (next.direction - previous.direction) * progress + next.direction;
-
-	if(previous.bullet) {
-		this.shoot(previous.bullet);
-		previous.bullet = null;
-	}
+	this._shoot(time);
 };
 
 RemotePlayer.prototype._getUpdates = function(time) {
@@ -55,6 +56,17 @@ RemotePlayer.prototype._getUpdates = function(time) {
 			};
 		}
 	}
+};
+
+RemotePlayer.prototype._shoot = function(time) {
+	var options = this.bullets.shift();
+	if(!options || options.hit.t > time) return;
+
+	var hit = options.hit;
+	var bullet = new Bullet(this.game, this, hit.position, options.shoot);
+
+	bullet.move(time - hit.t);
+	this.game.addBody(bullet);
 };
 
 module.exports = RemotePlayer;
