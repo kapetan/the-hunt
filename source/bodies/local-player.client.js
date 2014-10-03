@@ -14,6 +14,10 @@ var LocalPlayer = function(game, controller, options) {
 	this.sequence = 0;
 
 	this.controller = controller;
+	this.attributes = {
+		kills: 0,
+		deaths: 0
+	};
 };
 
 util.inherits(LocalPlayer, Player);
@@ -75,6 +79,17 @@ LocalPlayer.prototype.reconcile = function(update) {
 	this.inputs.forEach(function(i) {
 		self.processInput(i.input, i.dt);
 	});
+};
+
+LocalPlayer.prototype.handleUpdate = function(update) {
+	if(!update.bullet) return;
+
+	if(update.id === this.id && update.bullet.hit.body) {
+		this.attributes.kills++;
+	}
+	if(update.id !== this.id && update.bullet.hit.body === this.id) {
+		this.attributes.deaths++;
+	}
 };
 
 module.exports = LocalPlayer;

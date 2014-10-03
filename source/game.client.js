@@ -149,6 +149,7 @@ Game.prototype._initializeLocal = function(options) {
 		self._time.u = now;
 
 		self.update(dt);
+		self.emit('update');
 	}, UPDATE_FREQUENCY);
 
 	this._animation = requestAnimationFrame(function tick() {
@@ -163,14 +164,19 @@ Game.prototype._initializeRemote = function() {
 
 	socket.on('player_state', function(message) {
 		var update = find(message.players, { id: self.player.id });
-		if(update) self.player.reconcile(update);
+		if(update) {
+			self.player.reconcile(update);
+			self.player.handleUpdate(update);
+		}
 
 		self.others.forEach(function(other) {
 			var update = find(message.players, { id: other.id });
 
 			if(update) {
 				update.t = message.t;
+
 				other.addUpdate(update);
+				self.player.handleUpdate(update);
 			}
 		});
 	});

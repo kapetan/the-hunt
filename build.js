@@ -35,7 +35,6 @@ module.exports = function(callback) {
 	var next = afterAll(callback);
 
 	bundle(source('index.js'), destination, next());
-	bundle(source('offline.js'), destination, next());
 	copy(source('index.html'), destination, next());
 	copy(source('offline.html'), destination, next());
 };

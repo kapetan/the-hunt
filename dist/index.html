@@ -4,13 +4,80 @@
 		<title>Game</title>
 
 		<style type="text/css">
-			#canvas {
+			body {
+				padding: 0;
+				margin: 0;
+			}
+
+			#game {
+				position: relative;
+				display: inline-block;
 				border: 1px solid black;
+				font-size: 0;
+				margin: 10px;
+			}
+
+			#hud {
+				position: absolute;
+				bottom: 0;
+				left: 0;
+				width: 100%;
+
+				font-size: 14px;
+				font-family: "Courier New", Courier, monospace;
+				font-weight: bold;
+			}
+			#hud .item {
+				float: left;
+				padding: 5px 10px;
+				margin: 5px;
+				background-color: #000000;
+				opacity: 0.4;
+				border-radius: 2px;
+				color: #ffffff;
+			}
+			#hud .item.ammunition {
+				float: right;
+			}
+			#hud .ammunition .bar {
+				width: 75px;
+				height: 8px;
+				background-color: #ffffff;
+				margin: 4px 0;
+			}
+			#hud .ammunition .progress {
+				height: 100%;
+				width: 100%;
+				background-color: #ff2f00;
+			}
+			#hud .clear {
+				clear: both;
 			}
 		</style>
 	</head>
 	<body>
-		<canvas id="canvas" width="512" height="512"></canvas>
+		<div id="game">
+			<canvas id="canvas" width="512" height="512"></canvas>
+
+			<div id="hud">
+				<div class="kills item">
+					<span class="label">K:</span>
+					<span class="value">0</span>
+				</div>
+				<div class="deaths item">
+					<span class="label">D:</span>
+					<span class="value">0</span>
+				</div>
+
+				<div class="ammunition item">
+					<div class="bar">
+						<div class="progress"></div>
+					</div>
+				</div>
+
+				<div class="clear"></div>
+			</div>
+		</div>
 
 		<script src="/socket.io/socket.io.js"></script>
 		<script type="text/javascript" src="index.js"></script>

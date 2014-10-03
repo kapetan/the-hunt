@@ -4,15 +4,21 @@
 		<title>Game</title>
 
 		<style type="text/css">
-			#canvas {
-				border: 1px solid black;
-				display: block;
-				margin: 0 auto;
+			html, body {
+				padding: 0;
+				margin: 0;
+			}
+
+			iframe {
+				margin: 0;
+				padding: 0;
+				border: none;
+				width: 534px;
+				height: 534px;
 			}
 		</style>
 	</head>
 	<body>
-		<canvas id="canvas" width="512" height="512"></canvas>
-		<script type="text/javascript" src="offline.js"></script>
+		<iframe src="index.html?offline=1"></iframe>
 	</body>
 </html>
