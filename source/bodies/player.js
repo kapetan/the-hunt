@@ -84,7 +84,7 @@ Player.prototype.processInput = function(input, dt) {
 	var bounds = new Rectangle(next, this.size, next.direction);
 
 	if(!this.game.inBounds(bounds)) return;
-	if(this.game.isColliding(bounds, [this])) return;
+	if(this.game.isColliding(bounds, this)) return;
 
 	this.position.x = next.x;
 	this.position.y = next.y;

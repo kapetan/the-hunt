@@ -4,22 +4,26 @@ var extend = require('xtend');
 var math = require('../math');
 var Rectangle = require('./rectangle');
 
-var COLOR = [0, 0, 0];
-
 var rgba = function(color, alpha) {
 	return util.format('rgba(%s, %s, %s, %s)', color[0], color[1], color[2], alpha);
 };
 
 var Base = function(game, options) {
-	options = options || {};
-
 	this.game = game;
 
-	this.position = options.position || { x: 0, y: 0 };
-	this.size = options.size || { width: 0, height: 0 };
-	this.direction = options.direction || 0;
-	this.visibility = (options.visibility === undefined) ? 1 : options.visibility;
-	this.color = options.color || COLOR;
+	options = extend({
+		position: { x: 0, y: 0 },
+		size: { width: 0, height: 0 },
+		direction: 0,
+		visibility: 1,
+		color: [0, 0, 0]
+	}, options);
+
+	this.position = { x: options.position.x, y: options.position.y };
+	this.size = { width: options.size.width, height: options.size.height };
+	this.direction = options.direction;
+	this.visibility = options.visibility;
+	this.color = options.color;
 };
 
 Base.prototype.getRectangle = function() {

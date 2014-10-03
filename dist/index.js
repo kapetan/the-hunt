@@ -1195,22 +1195,26 @@ var extend = require('xtend');
 var math = require('../math');
 var Rectangle = require('./rectangle');
 
-var COLOR = [0, 0, 0];
-
 var rgba = function(color, alpha) {
 	return util.format('rgba(%s, %s, %s, %s)', color[0], color[1], color[2], alpha);
 };
 
 var Base = function(game, options) {
-	options = options || {};
-
 	this.game = game;
 
-	this.position = options.position || { x: 0, y: 0 };
-	this.size = options.size || { width: 0, height: 0 };
-	this.direction = options.direction || 0;
-	this.visibility = (options.visibility === undefined) ? 1 : options.visibility;
-	this.color = options.color || COLOR;
+	options = extend({
+		position: { x: 0, y: 0 },
+		size: { width: 0, height: 0 },
+		direction: 0,
+		visibility: 1,
+		color: [0, 0, 0]
+	}, options);
+
+	this.position = { x: options.position.x, y: options.position.y };
+	this.size = { width: options.size.width, height: options.size.height };
+	this.direction = options.direction;
+	this.visibility = options.visibility;
+	this.color = options.color;
 };
 
 Base.prototype.getRectangle = function() {
@@ -1320,18 +1324,19 @@ var Bullet = function(game, player, hit, options) {
 	this.player = player;
 	this.hit = hit;
 
-	var position = math.translate(player.position, player.direction, player.size.width / 2 + RADIUS + 1);
 
 	options = extend({
-		position: position,
+		position: player.position,
 		direction: player.direction,
 		visibility: 1
 	}, options);
 
-	this.active = true;
-	this.collidable = false;
+	var position = math.translate(options.position, options.direction, (player.size.width + RADIUS) / 2);
 
-	this.position = options.position;
+	this.collidable = false;
+	this.active = true;
+
+	this.position = position;
 	this.direction = options.direction;
 	this.visibility = options.visibility;
 };
@@ -1358,7 +1363,7 @@ Bullet.prototype.move = function(dt) {
 };
 
 Bullet.prototype.explode = function() {
-	explosion(this.game, this.position);
+	explosion(this.game, this.position, [0, 0, 0]);
 	explosion(this.game, this.position, [255, 163, 18]);
 
 	this.game.removeBody(this);
@@ -1468,6 +1473,8 @@ var util = require('util');
 
 var Player = require('./player');
 var Bullet = require('./bullet');
+
+var copy = require('../utils/copy');
 var find = require('../utils/find');
 
 var LocalPlayer = function(game, controller, options) {
@@ -1503,15 +1510,18 @@ LocalPlayer.prototype.update = function(dt) {
 		});
 
 		if(this.hasShot()) {
-			var hit = this.game.hitscan(this);
-			var shoot = new Bullet(this.game, this, hit.position);
+			var hit = this.game.hitscan(this.position, this.direction, this);
+			var bullet = new Bullet(this.game, this, hit.position);
 
-			this.pending[this.pending.length - 1].bullet = {
-				shoot: shoot,
-				hit: hit
-			};
+			this.pending[this.pending.length - 1].bullet = copy({
+				hit: hit,
+				shoot: {
+					position: this.position,
+					direction: this.direction
+				}
+			});
 
-			this.game.addBullet(shoot);
+			this.game.addBullet(bullet);
 		}
 	}
 };
@@ -1540,7 +1550,7 @@ LocalPlayer.prototype.reconcile = function(update) {
 
 module.exports = LocalPlayer;
 
-},{"../utils/find":29,"./bullet":11,"./player":14,"util":8}],14:[function(require,module,exports){
+},{"../utils/copy":29,"../utils/find":30,"./bullet":11,"./player":14,"util":8}],14:[function(require,module,exports){
 var util = require('util');
 var extend = require('xtend');
 
@@ -1627,7 +1637,7 @@ Player.prototype.processInput = function(input, dt) {
 	var bounds = new Rectangle(next, this.size, next.direction);
 
 	if(!this.game.inBounds(bounds)) return;
-	if(this.game.isColliding(bounds, [this])) return;
+	if(this.game.isColliding(bounds, this)) return;
 
 	this.position.x = next.x;
 	this.position.y = next.y;
@@ -1998,8 +2008,8 @@ Game.prototype.stop = function() {
 	this._socket = null;
 };
 
-Game.prototype.hitscan = function(source) {
-	var hit = Core.prototype.hitscan.call(this, source);
+Game.prototype.hitscan = function(position, direction, ignore) {
+	var hit = Core.prototype.hitscan.call(this, position, direction, ignore);
 	hit.t = this._time.v;
 
 	return hit;
@@ -2127,7 +2137,7 @@ Game.prototype._synchronizeTime = function(callback) {
 
 module.exports = Game;
 
-},{"./bodies/local-player.client":13,"./bodies/remote-player.client":16,"./game":19,"./keyboard":22,"./levels/level-1":24,"./mouse":27,"./utils/find":29,"./utils/remove":30,"util":8,"xtend":9}],19:[function(require,module,exports){
+},{"./bodies/local-player.client":13,"./bodies/remote-player.client":16,"./game":19,"./keyboard":22,"./levels/level-1":24,"./mouse":27,"./utils/find":30,"./utils/remove":31,"util":8,"xtend":9}],19:[function(require,module,exports){
 var events = require('events');
 var util = require('util');
 
@@ -2185,7 +2195,7 @@ Game.prototype.removeBody = function(body) {
 
 Game.prototype.isColliding = function(rectangle, ignore) {
 	return this.bodies.some(function(body) {
-		if(ignore && ignore.indexOf(body) >= 0) return false;
+		if(body === ignore) return false;
 		return body.collidable && rectangle.isColliding(body.getRectangle());
 	});
 };
@@ -2194,16 +2204,13 @@ Game.prototype.inBounds = function(rectangle) {
 	return this.bounds.isRectangleInside(rectangle);
 };
 
-Game.prototype.hitscan = function(source) {
-	var position = source.position;
-	var direction = source.direction;
-
+Game.prototype.hitscan = function(position, direction, ignore) {
 	var hit;
 	var distance;
 	var body;
 
 	this.bodies.forEach(function(b) {
-		if(b === source || !b.collidable) return;
+		if(b === ignore || !b.collidable) return;
 
 		var rectangle = b.getRectangle();
 		var intersections = rectangle.getIntersections(position, direction);
@@ -2231,7 +2238,7 @@ Game.prototype.hitscan = function(source) {
 
 module.exports = Game;
 
-},{"./bodies/rectangle":15,"./math":26,"./utils/append":28,"./utils/remove":30,"events":1,"util":8}],20:[function(require,module,exports){
+},{"./bodies/rectangle":15,"./math":26,"./utils/append":28,"./utils/remove":31,"events":1,"util":8}],20:[function(require,module,exports){
 var qs = require('querystring');
 var Game = require('./game.client');
 
@@ -2567,6 +2574,11 @@ module.exports = function(arr, items) {
 };
 
 },{}],29:[function(require,module,exports){
+module.exports = function(obj) {
+	return JSON.parse(JSON.stringify(obj));
+};
+
+},{}],30:[function(require,module,exports){
 var find = function(arr, fn) {
 	for(var i = 0; i < arr.length; i++) {
 		var item = arr[i];
@@ -2587,7 +2599,7 @@ module.exports = function(arr, obj) {
 	return find(arr, fn);
 };
 
-},{}],30:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 var remove = function(arr, item) {
 	var i = arr.indexOf(item);
 	if(i >= 0) arr.splice(i, 1);

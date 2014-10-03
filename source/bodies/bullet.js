@@ -76,18 +76,19 @@ var Bullet = function(game, player, hit, options) {
 	this.player = player;
 	this.hit = hit;
 
-	var position = math.translate(player.position, player.direction, player.size.width / 2 + RADIUS + 1);
 
 	options = extend({
-		position: position,
+		position: player.position,
 		direction: player.direction,
 		visibility: 1
 	}, options);
 
-	this.active = true;
-	this.collidable = false;
+	var position = math.translate(options.position, options.direction, (player.size.width + RADIUS) / 2);
 
-	this.position = options.position;
+	this.collidable = false;
+	this.active = true;
+
+	this.position = position;
 	this.direction = options.direction;
 	this.visibility = options.visibility;
 };
@@ -114,7 +115,7 @@ Bullet.prototype.move = function(dt) {
 };
 
 Bullet.prototype.explode = function() {
-	explosion(this.game, this.position);
+	explosion(this.game, this.position, [0, 0, 0]);
 	explosion(this.game, this.position, [255, 163, 18]);
 
 	this.game.removeBody(this);

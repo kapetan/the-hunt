@@ -55,7 +55,7 @@ Game.prototype.removeBody = function(body) {
 
 Game.prototype.isColliding = function(rectangle, ignore) {
 	return this.bodies.some(function(body) {
-		if(ignore && ignore.indexOf(body) >= 0) return false;
+		if(body === ignore) return false;
 		return body.collidable && rectangle.isColliding(body.getRectangle());
 	});
 };
@@ -64,16 +64,13 @@ Game.prototype.inBounds = function(rectangle) {
 	return this.bounds.isRectangleInside(rectangle);
 };
 
-Game.prototype.hitscan = function(source) {
-	var position = source.position;
-	var direction = source.direction;
-
+Game.prototype.hitscan = function(position, direction, ignore) {
 	var hit;
 	var distance;
 	var body;
 
 	this.bodies.forEach(function(b) {
-		if(b === source || !b.collidable) return;
+		if(b === ignore || !b.collidable) return;
 
 		var rectangle = b.getRectangle();
 		var intersections = rectangle.getIntersections(position, direction);

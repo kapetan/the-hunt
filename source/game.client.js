@@ -121,8 +121,8 @@ Game.prototype.stop = function() {
 	this._socket = null;
 };
 
-Game.prototype.hitscan = function(source) {
-	var hit = Core.prototype.hitscan.call(this, source);
+Game.prototype.hitscan = function(position, direction, ignore) {
+	var hit = Core.prototype.hitscan.call(this, position, direction, ignore);
 	hit.t = this._time.v;
 
 	return hit;
