@@ -23,6 +23,10 @@ ServerPlayer.prototype.update = function(dt) {
 	var update = this.updates.shift();
 
 	if(update) {
+		if(!update.bullet) {
+			delete update.input.shoot;
+		}
+
 		this.processInput(update.input, dt);
 		this.sequence = update.sequence;
 
