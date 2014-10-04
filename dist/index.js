@@ -2263,6 +2263,18 @@ module.exports = Game;
 var qs = require('querystring');
 var Game = require('./game.client');
 
+var parseOptions = function() {
+	var options = qs.parse(window
+		.location
+		.search
+		.replace(/^\?/, ''));
+
+	options.debug = options.debug &&
+		window.location.hostname === 'localhost';
+
+	return options;
+};
+
 var getElementByQuerySelector = function(root, query) {
 	return root.querySelectorAll(query)[0]
 };
@@ -2285,12 +2297,7 @@ HUD.prototype.update = function(attributes) {
 	this.ammunition.style.width = ammunition + '%';
 };
 
-var options = qs.parse(window
-		.location
-		.search
-		.replace(/^\?/, ''));
-
-var game = new Game('canvas', options);
+var game = new Game('canvas', parseOptions());
 var hud = new HUD('hud');
 
 game.on('update', function() {
