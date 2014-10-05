@@ -22,6 +22,10 @@ io.on('connection', function(socket) {
 	var others = game.players.slice();
 	var player = game.addPlayer(socket);
 
+	var log = function(message) {
+		console.log(message, { id: player.id, players: game.players.length });
+	};
+
 	socket.emit('initialize', {
 		self: player,
 		others: others,
@@ -37,7 +41,11 @@ io.on('connection', function(socket) {
 	socket.on('disconnect', function() {
 		game.removePlayer(player);
 		socket.broadcast.emit('player_leave', { id: player.id });
+
+		log('Player left');
 	});
+
+	log('Player joined');
 });
 
 game.on('player_state', function(data) {
