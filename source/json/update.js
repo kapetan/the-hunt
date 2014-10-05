@@ -1,42 +1,42 @@
 /*
 	[
-	    {
-	        "input": {
-	            "shoot": true
-	        },
-	        "sequence": 0,
-	        "bullet": {
-	            "hit": {
-	                "position": {
-	                    "x": 449.45670109748676,
-	                    "y": 301.48442554473877
-	                },
-	                "t": 1412498978577
-	            },
-	            "shoot": {
-	                "position": {
-	                    "x": 49.89498329162598,
-	                    "y": 301.48442554473877
-	                },
-	                "direction": 0
-	            }
-	        }
-	    },
-	    {
-	        "input": {
-	            "up": true
-	        },
-	        "sequence": 1
-	    },
-	    {
-	        "input": {
-	            "target": {
+		{
+			"input": {
+				"shoot": true
+			},
+			"sequence": 0,
+			"bullet": {
+				"hit": {
+					"position": {
+						"x": 449.45670109748676,
+						"y": 301.48442554473877
+					},
+					"t": 1412498978577
+				},
+				"shoot": {
+					"position": {
+						"x": 49.89498329162598,
+						"y": 301.48442554473877
+					},
+					"direction": 0
+				}
+			}
+		},
+		{
+			"input": {
+				"up": true
+			},
+			"sequence": 1
+		},
+		{
+			"input": {
+				"target": {
 					"x": 350,
 					"y": 200
-	            }
-	        },
-	        "sequence": 2
-	    }
+				}
+			},
+			"sequence": 2
+		}
 	]
 */
 
