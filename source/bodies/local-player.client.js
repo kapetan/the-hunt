@@ -55,6 +55,8 @@ LocalPlayer.prototype.update = function(dt) {
 			});
 
 			this.game.addBullet(bullet);
+		} else {
+			delete input.shoot;
 		}
 	}
 };

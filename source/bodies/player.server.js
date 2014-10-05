@@ -1,6 +1,11 @@
 var util = require('util');
+var validator = require('is-my-json-valid');
+
 var Player = require('./player');
 var append = require('../utils/append');
+var updateJSON = require('../json/update');
+
+var isUpdateValid = validator(updateJSON);
 
 var ServerPlayer = function(game, socket, options) {
 	Player.call(this, game, options);
@@ -11,6 +16,7 @@ var ServerPlayer = function(game, socket, options) {
 	this.sequence = -1;
 
 	socket.on('update', function(updates) {
+		if(!isUpdateValid(updates)) return socket.disconnect();
 		append(self.updates, updates);
 	});
 };

@@ -1526,6 +1526,8 @@ LocalPlayer.prototype.update = function(dt) {
 			});
 
 			this.game.addBullet(bullet);
+		} else {
+			delete input.shoot;
 		}
 	}
 };
@@ -2276,7 +2278,7 @@ var parseOptions = function() {
 };
 
 var getElementByQuerySelector = function(root, query) {
-	return root.querySelectorAll(query)[0]
+	return root.querySelectorAll(query)[0];
 };
 
 var HUD = function(element) {
