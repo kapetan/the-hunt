@@ -2,7 +2,7 @@
 
 A small 2D multiplayer game written in Javascript for moderne browsers which support the `canvas` and `requestAnimationFrame` APIs.
 
-Use the arrow keys to move around and `space` to shoot (has no effect at the moment).
+Use the arrow keys to move around and `space` to shoot.
 
 To start the game clone this repository and run the following in a terminal.
 
